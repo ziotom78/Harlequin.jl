@@ -16,7 +16,20 @@ features:
 
 If you are looking for a more mature and comprehensive toolkit, which
 includes several more features, be sure to have a look at
-[TOAST](https://github.com/hpc4cmb/toast).
+[TOAST](https://github.com/hpc4cmb/toast). This includes a full-scale
+map-maker (MADAM), beam convolution, half-wave plate simulation,
+atmospheric effects (useful for ground experiments). Moreover, it uses
+Python instead of Julia, and it is much better supported on HPC
+superclusters.
+
+A few advantages of Harlequin over TOAST are the following:
+
+- It works under Linux, Mac, and Windows;
+- It strives to have comprehensive documentation;
+- It can use the Julia ecosystem, including awesome tools as [plot
+  recipes](https://github.com/JuliaPlots/RecipesBase.jl), [interactive
+  widgets](https://github.com/JuliaGizmos/Interact.jl), [error
+  propagation](https://github.com/JuliaPhysics/Measurements.jl), etc.
 
 # Documentation
 
