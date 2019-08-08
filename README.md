@@ -1,6 +1,4 @@
-![Harlequin](harlequin_logo.svg | width=480)
-
-# Harlequin
+![Harlequin](harlequin_logo.svg)
 
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://ziotom78.github.io/Harlequin.jl/stable)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://ziotom78.github.io/Harlequin.jl/dev)
