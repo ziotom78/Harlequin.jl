@@ -9,6 +9,10 @@ end
     include("test_genpointings.jl")
 end
 
+@testset "Segmented time spans" begin
+    include("test_sts.jl")
+end
+
 @testset "Dipole analysis" begin
     include("test_dipole.jl")
 end

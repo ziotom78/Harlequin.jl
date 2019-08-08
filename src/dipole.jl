@@ -54,6 +54,7 @@ any of the following keywords to set the parameters:
 Here is an example where we produce a dipole that is 10% stronger than Planck's:
 
 ````julia
+using Harlequin # hide
 dip = DipoleParameters(speed_m_s = SOLSYS_SPEED_VEC_M_S * 1.10)
 ````
 """
@@ -138,11 +139,6 @@ with respect to the CMB rest frame, it is easier to use
 
 # Example
 
-````jldoctest
-julia> 
-
-julia> 
-````
 """
 doppler_temperature
 
@@ -181,7 +177,7 @@ If you need to compute the temperature caused by any other kinetic component
 
 # Example
 
-````jldoctest
+````julia
 julia> dipole_temperature([0, 0, 1])
 -0.0006532169921239991
 
