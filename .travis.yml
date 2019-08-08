@@ -22,5 +22,7 @@ jobs:
           using Pkg;
           Pkg.develop(PackageSpec(path=pwd()));
           Pkg.instantiate();
+          Pkg.add("Healpix");
+          Pkg.add("Plots");
           include("docs/make.jl");'
       after_success: skip
