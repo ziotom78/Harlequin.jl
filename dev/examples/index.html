@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Practical examples · Harlequin.jl</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link href="../assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>Harlequin.jl</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../">Home</a></li><li><a class="toctext" href="../genpointings/">Pointing generation</a></li><li><a class="toctext" href="../mapmaking/">Map-making</a></li><li class="current"><a class="toctext" href>Practical examples</a><ul class="internal"><li><a class="toctext" href="#Scanning-strategy-1">Scanning strategy</a></li><li><a class="toctext" href="#Noise-simulations-1">Noise simulations</a></li><li><a class="toctext" href="#Map-making-1">Map-making</a></li></ul></li></ul></nav><article id="docs"><header><nav><ul><li><a href>Practical examples</a></li></ul><a class="edit-page" href="https://github.com/ziotom78/Harlequin.jl/blob/master/docs/src/examples.md#L"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>Practical examples</span><a class="fa fa-bars" href="#"></a></div></header><h1><a class="nav-anchor" id="Practical-examples-1" href="#Practical-examples-1">Practical examples</a></h1><p>In this section, we present a number of examples that show how to use Harlequin in a number of practical situations. All the examples are meant to be short and easy to follow; the ideas provided here can help the reader in build more complex scripts and simulations.</p><h2><a class="nav-anchor" id="Scanning-strategy-1" href="#Scanning-strategy-1">Scanning strategy</a></h2><h3><a class="nav-anchor" id="Creating-a-scanning-strategy-1" href="#Creating-a-scanning-strategy-1">Creating a scanning strategy</a></h3><p>In this exercise, we take the definition of the scanning strategy of a CMB space mission and create a <a href="../genpointings/#Harlequin.ScanningStrategy"><code>ScanningStrategy</code></a> object.</p><p>We choose the scanning strategy devised for the <a href="https://ui.adsabs.harvard.edu/abs/2019arXiv190210541H/abstract">PICO mission proposal</a> (Hanany, 2019), described in Sect. 4.1.2. Once we have created the object, we use the <a href="https://github.com/JuliaPlots/Plots.jl"><code>Plots</code></a> package to draw a diagram:</p><pre><code class="language-">using Harlequin # hide
+sstr = ScanningStrategy(
+    spin_rpm = 1,
+    prec_rpm = 1 / (10 * 60),      # Precession period is 10 hr
+    hwp_rpm = 0.0,                 # No half-wave plate for PICO
+    spinsunang_rad = deg2rad(26),
+    borespinang_rad = deg2rad(69),
+)
+
+using Plots # hide
+plot(sstr)</code></pre><p>This matches Fig. 4.2 in the PICO report.</p><p>Note that Harlequin already provides a few [<code>ScanningStrategy</code>] objects for some notable CMB space proposals (see <a href="../genpointings/#Pre-defined-scanning-strategies-1">Pre-defined scanning strategies</a>).</p><h3><a class="nav-anchor" id="Generating-a-sequence-of-pointings-1" href="#Generating-a-sequence-of-pointings-1">Generating a sequence of pointings</a></h3><p>You can use the function <a href="../genpointings/#Harlequin.genpointings!"><code>genpointings!</code></a> to produce a matrix containing the colatitude, longitude, and polarization angle for each sample in a span of time.</p><p>In the following example we generate 5 minutes of data, using the scanning strategy of the CORE mission proposal and assuming that the beam is along the boresight direction. We sample the pointing direction once every 0.1 s:</p><pre><code class="language-">using Harlequin # hide
+using Plots
+
+time_span = 0 : 0.1 : 5 * 60
+result = genpointings(
+    CORE_SCANNING_STRATEGY,
+    time_span,
+    Float64[0, 0, 1],         # Beam direction
+    0.0,                      # Start value for the polarization angle psi
+)
+
+theta, phi, psi, x, y, z = (result[:, colidx] for colidx in 1:6)
+
+plot(time_span, rad2deg.(theta), label=&quot;&quot;,
+     xlabel=&quot;Time [s]&quot;, ylabel=&quot;Colatitude [deg]&quot;)</code></pre><h3><a class="nav-anchor" id="Producing-a-hit-map-1" href="#Producing-a-hit-map-1">Producing a hit map</a></h3><p>Producing a hit map usually requires to consider huge spans of time. Therefore, it is advisable to pre-allocate the pointing matrix and use <a href="../genpointings/#Harlequin.genpointings!"><code>genpointings!</code></a> instead of <a href="../genpointings/#Harlequin.genpointings"><code>genpointings</code></a> within a <code>for</code> loop.</p><p>We follow the example above (<a href="#Generating-a-sequence-of-pointings-1">Generating a sequence of pointings</a>), but this time we use the PICO scanning strategy. We simulate one day of observations with a beam aligned along the boresight direction, and we produce a Healpix map with <code>NSIDE = 256</code>, using the <a href="https://github.com/ziotom78/Healpix.jl">Healpix.jl</a> package. Note that we take advantage of <a href="../genpointings/#Harlequin.SegmentedTimeSpan"><code>SegmentedTimeSpan</code></a> to split the day into segments of 24 hours.</p><pre><code class="language-">using Harlequin # hide
+using Healpix
+using Plots     # To use &quot;plot&quot; with Healpix maps
+
+sts = SegmentedTimeSpan(
+    start_time = 0.0,
+    sampling_time = 0.1,
+    segment_duration = 3600,  # One hour
+    num_of_segments = 24,     # One day of observations
+)
+
+hitmap = Map{Float16, RingOrder}(256)
+
+beam_dir = Float64[0, 0, 1]   # Boresight direction
+
+pointings = Array{Float64}(undef, length(sts[1]), 6)
+
+# Loop over each hour
+for cur_timespan_s in sts
+    genpointings!(
+        PICO_SCANNING_STRATEGY, 
+        cur_timespan_s, 
+        beam_dir, 
+        0.0, 
+        pointings,   # The result is saved here
+    )
+
+    # Project the pointings on the sky sphere
+    theta, phi = (pointings[:, colidx] for colidx in (1, 2))
+    pixidx = ang2pix.(Ref(hitmap), theta, phi)
+    hitmap[pixidx] .= 1
+end
+
+# Show the hitmap
+plot(hitmap)</code></pre><h3><a class="nav-anchor" id="Estimating-the-fraction-of-sky-covered-by-a-scanning-strategy-1" href="#Estimating-the-fraction-of-sky-covered-by-a-scanning-strategy-1">Estimating the fraction of sky covered by a scanning strategy</a></h3><p>In this example, we produce a plot which shows the fraction of the sky covered by the CORE scanning strategy as a function of time. It takes a number of ideas from the examples shown above.</p><pre><code class="language-">using Harlequin # hide
+using Healpix
+using Plots
+
+sts = SegmentedTimeSpan(
+    start_time = 0.0,
+    sampling_time = 0.1,
+    segment_duration = 60,   # One minute
+    num_of_segments = 60,    # One hour of observations
+)
+
+hitmap = Map{Float16, RingOrder}(512)
+
+beam_dir = Float64[0, 0, 1]   # Boresight direction
+
+pointings = Array{Float64}(undef, length(sts[1]), 6)
+
+mins = Int64[]  # This will hold the minutes (X axis of the plot)
+fsky = Float64[] # This will hold the sky fraction (Y axis)
+
+# Loop over each minute
+for (cur_min, cur_timespan_s) in enumerate(sts)
+    genpointings!(
+        CORE_SCANNING_STRATEGY, 
+        cur_timespan_s, 
+        beam_dir, 
+        0.0, 
+        pointings,   # The result is saved here
+    )
+
+    # Project the pointings on the sky sphere
+    theta, phi = (pointings[:, colidx] for colidx in (1, 2))
+    pixidx = ang2pix.(Ref(hitmap), theta, phi)
+    hitmap[pixidx] .= 1
+    
+    cur_fsky = length(hitmap[hitmap .&gt; 0]) / length(hitmap)
+    push!(mins, cur_min)
+    push!(fsky, cur_fsky)
+end
+
+# Show the hitmap
+plot(mins, fsky .* 100, label=&quot;&quot;,
+     xlabel=&quot;Time [min]&quot;, ylabel=&quot;Sky fraction [%]&quot;)</code></pre><h2><a class="nav-anchor" id="Noise-simulations-1" href="#Noise-simulations-1">Noise simulations</a></h2><h3><a class="nav-anchor" id="Running-a-Monte-Carlo-simulation-1" href="#Running-a-Monte-Carlo-simulation-1">Running a Monte Carlo simulation</a></h3><p>To be written!</p><h2><a class="nav-anchor" id="Map-making-1" href="#Map-making-1">Map-making</a></h2><p>To be written!</p><footer><hr/><a class="previous" href="../mapmaking/"><span class="direction">Previous</span><span class="title">Map-making</span></a></footer></article></body></html>
