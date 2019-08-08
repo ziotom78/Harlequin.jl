@@ -26,5 +26,5 @@ It is available both for the
 
 # License
 
-Harlequin is released under a permissive MIT license. See LICENSE for
-more information.
+Harlequin is released under a permissive MIT license. See
+[LICENSE](LICENSE) for more information.
