@@ -443,6 +443,8 @@ the following fields:
   troublesome in the reconstruction of tehe I/Q/U components
 - `baselines`: the computed baselines. These must be kept as a list of
   `RunLengthArray` objects
+- `stopping_factors`: sequence of stopping factors, one for
+  each iteration of the CG algorithm
 - `threshold`: upper limit on the tolerable error for the Conjugated
   Gradient method (optional, default is `1e-9`). See
   [`calc_stopping_factor`](@ref).
@@ -461,7 +463,7 @@ mutable struct DestripingData{T <: Number, O <: Healpix.Order}
     hitmap::Healpix.Map{T, O}
     nobs_matrix::Vector{NobsMatrixElement}
     baselines::Vector{RunLengthArray{Int, T}}
-
+    stopping_factors::Vector{T}
     threshold::Float64
     max_iterations::Int
     use_preconditioner::Bool
@@ -492,6 +494,7 @@ mutable struct DestripingData{T <: Number, O <: Healpix.Order}
             Healpix.Map{T,O}(nside),
             nobs_matrix,
             [RunLengthArray{Int,T}(x, zeros(length(x))) for x in runs],
+            T[],  # List of stopping factors
             threshold,
             max_iterations,
             use_preconditioner,
@@ -918,11 +921,12 @@ include("preconditioners.jl")
 include("covmatrix.jl")
 
 @doc raw"""
-    destripe!(obs_list, destriping_data; comm, unseen, callback) where {T <: Number, O <: Healpix.Order}
+    destripe!(obs_list, destriping_data::DestripingData{T,O}; comm, unseen, callback) where {T <: Number, O <: Healpix.Order}
 
 Apply the destriping algorithm to the TOD in `obs_list`. The result is
-returned in `baselines` (set of baselines) and `destriping_data`
-(I/Q/U maps, weight map, M_p matrices).
+returned in `destriping_data`, which is of type
+[`DestripingData`](@ref) and contains the baselines, I/Q/U maps,
+weight map, etc.
 
 The parameters must satisfy the following constraints:
 
@@ -941,14 +945,11 @@ The optional keyword have the following meaning and default value:
   called before the CG algorithm starts, and then once every
   iteration. It can be used to monitor the progress of the destriper,
   or to save intermediate results in a database or a file. The
-  function must accept the following parameters:
-
-  1. Iteration number, starting from 1
-  2. Current stopping factor
-  3. The value of `destriping_data`
+  function receives `destriping_data` as its parameter
 
 The function uses Julia's `Logging` module. Therefore, you can enable
-the output of diagnostic messages, like in the following example:
+the output of diagnostic messages as usual; consider the following
+example:
 
 ```julia
 global_logger(ConsoleLogger(stderr, Debug))
@@ -988,11 +989,11 @@ function destripe!(
     )
     k = 0
 
-    list_of_stopping_factors = []
+    destriping_data.stopping_factors = T[]
 
     stopping_factor = calc_stopping_factor(r, comm = comm)
-    push!(list_of_stopping_factors, stopping_factor)
-    stopping_factor < destriping_data.threshold && return list_of_stopping_factors
+    push!(destriping_data.stopping_factors, stopping_factor)
+    stopping_factor < destriping_data.threshold && return
 
     precond = if destriping_data.use_preconditioner
         jacobi_preconditioner(
@@ -1042,7 +1043,7 @@ function destripe!(
         apply_offset_to_baselines!(destriping_data.baselines)
 
         stopping_factor = calc_stopping_factor(r, comm = comm)
-        push!(list_of_stopping_factors, stopping_factor)
+        push!(destriping_data.stopping_factors, stopping_factor)
         if stopping_factor < best_stopping_factor
             best_a = deepcopy(destriping_data.baselines)
             best_stopping_factor = stopping_factor
@@ -1061,12 +1062,10 @@ function destripe!(
             p[obsidx].values .= z[obsidx] + (new_z_dot_r / old_z_dot_r) * p[obsidx].values
         end
 
-        (callback === nothing) || callback(k, stopping_factor, destriping_data)
+        (callback === nothing) || callback(destriping_data)
         old_z_dot_r = new_z_dot_r
     end
 
     @debug "Producing the map"
     calculate_cleaned_map!(obs_list, destriping_data, comm = comm, unseen = unseen)
-
-    list_of_stopping_factors
 end
