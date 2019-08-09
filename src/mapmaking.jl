@@ -11,7 +11,8 @@ import RunLengthArrays: RunLengthArray, runs, values
 import Healpix
 import Logging: @debug, @info, @warn
 import Logging: ConsoleLogger, global_logger, Info, Debug
-import Statistics: mean
+import Statistics: mean, std
+import Printf: @sprintf
 
 ################################################################################
 
@@ -523,6 +524,48 @@ mutable struct DestripingData{T <: Number, O <: Healpix.Order}
 
 end
 
+function Base.show(io::IO, d::DestripingData)
+    print(io, "DestripingData(NSIDE=$(d.hitmap.resolution.nside))")
+end
+
+function Base.show(io::IO, ::MIME"text/plain", d::DestripingData)
+    # Count how many pixels have been observed in the map
+    obspix = 0
+    for elem in d.nobs_matrix
+        elem.neglected || (obspix += 1)
+    end
+
+    # Put all the baselines of each observation into one long list
+    # (without allocating memory!)
+    flattened_baselines = Iterators.flatten([values(x) for x in d.baselines])
+
+    println(
+        io,
+        @sprintf(
+            """Destriping data:
+NSIDE of the map........................ %d
+Number of observed pixels............... %d (%.1f%%)
+Number of iterations.................... %d/%d
+Best convergence factor................. %s (threshold: %e)
+Number of observations.................. %d
+Average value of the baselines.......... %e
+RMS of the baselines.................... %e
+Preconditioner.......................... %s
+""",
+            d.hitmap.resolution.nside,
+            obspix,
+            100.0 * obspix / length(d.nobs_matrix),
+            length(d.stopping_factors),
+            d.max_iterations,
+            isempty(d.stopping_factors) ? "none" : @sprintf("%e", minimum(d.stopping_factors)),
+            d.threshold,
+            length(d.baselines),
+            mean(flattened_baselines),
+            std(flattened_baselines),
+            "$(d.use_preconditioner)",
+        )
+    )
+end
 
 
 @doc raw"""
