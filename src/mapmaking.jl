@@ -148,8 +148,8 @@ end
     update_nobs_matrix!(nobs_matrix::Vector{NobsMatrixElement}, psi_angle, sigma_squared, pixidx, flagged)
 
 Apply Eq. (10) of KurkiSuonio2009 iteratively on the samples of a TOD
-to update matrices M_p in `nobs_matrix`. The meaning of the parameters
-is the following:
+to update matrices ``M_p`` in `nobs_matrix`. The meaning of the
+parameters is the following:
 
 - `nobs_matrix` is the structure that gets updated by this function
 - `psi_angle` is an array of `N` elements, containing the polarization
@@ -233,65 +233,95 @@ To create an observation, you can use the function
 and is therefore more readable.
 
 """
-mutable struct Observation
-    time::AbstractVector{Float64}
+mutable struct Observation{T <: Number}
+    time::AbstractVector{T}
     pixidx::Vector{Int}
-    psi_angle::Vector{Float64}
+    psi_angle::Vector{T}
 
-    tod::Vector{Float64}
-    sigma_squared::AbstractVector{Float64}
+    tod::Vector{T}
+    sigma_squared::AbstractVector{T}
     flagged::AbstractVector{Bool}
 
     name::String
+    
+    function Observation{T}(
+        ;
+        time = T[],
+        pixidx = Int[],
+        psi_angle = T[],
+        tod = T[],
+        sigma_squared = T[],
+        flagged = Bool[],
+        name = "unnamed",
+    ) where {T <: Number}
+        @assert !isempty(pixidx)
+        @assert length(psi_angle) == length(pixidx)
+        @assert length(tod) == length(pixidx)
+
+        int_time = isempty(time) ? (0:(length(tod) - 1)) : time
+        int_sigma_squared = isempty(sigma_squared) ? ones(T, length(tod)) : sigma_squared
+        int_flagged = isempty(flagged) ? zeros(Bool, length(tod)) : flagged
+
+        @assert length(int_time) == length(pixidx)
+        @assert length(int_sigma_squared) == length(pixidx)
+        @assert length(int_flagged) == length(pixidx)
+
+        new(
+            int_time,
+            pixidx,
+            psi_angle,
+            tod,
+            int_sigma_squared,
+            int_flagged,
+            name,
+        )
+    end
 end
 
-function observation(
-    ;
-    time = Float64[],
-    pixidx = Int[],
-    psi_angle = Float64[],
-    tod = Float64[],
-    sigma_squared = Float64[],
-    flagged = Bool[],
-    name = "",
-)
-    @assert length(pixidx) > 0
-    @assert length(psi_angle) == length(pixidx)
-    @assert length(tod) == length(pixidx)
+function Base.show(io::IO, obs::Observation)
+    print(io, "Observation(name => $(obs.name), samples = $(length(obs.time))")
+end
 
-    int_time = (length(time) > 0) ? time : 0:(length(tod) - 1)
-    sigma_squared = ((length(sigma_squared) > 0) ? sigma_squared :
-                     zeros(Float64, length(tod)))
-    flagged = (length(flagged) > 0) ? flagged : zeros(Bool, length(tod))
+function Base.show(io::IO, ::MIME"text/plain", obs::Observation)
 
-    @assert length(int_time) == length(pixidx)
-    @assert length(sigma_squared) == length(pixidx)
-    @assert length(flagged) == length(pixidx)
-
-    Observation(
-        time,
-        pixidx,
-        psi_angle,
-        tod,
-        sigma_squared,
-        flagged,
-        name,
+    isempty(obs.time) && println(io, "Observation for detector %(obs.name): empty")
+    
+    println(
+        io,
+        @sprintf(
+            """Observation for detector %s:
+Number of samples....................... %d
+Start time.............................. %f
+Duration................................ %f
+Number of flagged samples............... %d (%.1f%%)
+Average level of the TOD................ %e
+Average noise^2 level................... %e
+""",
+            obs.name,
+            length(obs.time),
+            obs.time[1],
+            obs.time[end] - obs.time[1],
+            length(obs.flagged[obs.flagged]),
+            100 * length(obs.flagged[obs.flagged]) / length(obs.flagged),
+            mean(obs.tod),
+            mean(obs.sigma_squared),
+        )
     )
 end
 
+
 @doc raw"""
-    compute_nobs_matrix!(nobs_matrix::Vector{NobsMatrixElement}, observations::Vector{Observation})
+    compute_nobs_matrix!(nobs_matrix::Vector{NobsMatrixElement}, observations::Vector{Observation{T}})
 
 Initialize all the elements in `nobs_matrix` so that they are the
 matrices M_p in Eq. (10) of KurkiSuonio2009. The TOD is taken from the
 list of observations in the parameter `observations`.
 
 """
-
 function compute_nobs_matrix!(
     nobs_matrix::Vector{NobsMatrixElement},
-    observations::Vector{Observation},
-)
+    observations::Vector{Observation{T}},
+) where {T}
 
     for submatrix in nobs_matrix
         submatrix.m .= 0.0
@@ -318,7 +348,7 @@ function update_binned_map!(
     vec,
     skymap::PolarizedMap{T, O},
     hitmap::Healpix.Map{T, O},
-    obs::Observation;
+    obs::Observation{T};
     comm = nothing,
     unseen = missing,
 ) where {T <: Number, O <: Healpix.Order}
@@ -349,7 +379,7 @@ end
 function update_binned_map!(
     skymap::PolarizedMap{T, O},
     hitmap::Healpix.Map{T, O},
-    obs::Observation;
+    obs::Observation{T};
     comm = nothing,
     unseen = missing,
 ) where {T <: Number, O <: Healpix.Order}
@@ -368,7 +398,7 @@ function update_binned_map!(
     vec_list,
     skymap::PolarizedMap{T, O},
     hitmap::Healpix.Map{T, O},
-    obs_list::Vector{Observation};
+    obs_list::Vector{Observation{T}};
     comm = nothing,
     unseen = missing,
 ) where {T <: Number, O <: Healpix.Order}
@@ -390,7 +420,7 @@ end
 function update_binned_map!(
     skymap::PolarizedMap{T, O},
     hitmap::Healpix.Map{T, O},
-    obs_list::Vector{Observation};
+    obs_list::Vector{Observation{T}};
     comm = nothing,
     unseen = missing,
 ) where {T <: Number, O <: Healpix.Order}
@@ -408,9 +438,9 @@ end
 
 
 @doc raw"""
-    update_binned_map!(vec, skymap::PolarizedMap{T, O}, hitmap::Healpix.Map{T, O}, obs::Observation; comm=nothing, unseen=NaN) where {T <: Number, O <: Healpix.Order}
-    update_binned_map!(skymap::PolarizedMap{T, O}, hitmap::Healpix.Map{T, O}, obs::Observation; comm=nothing, unseen=NaN) where {T <: Number, O <: Healpix.Order}
-    update_binned_map!(skymap::PolarizedMap{T, O}, hitmap::Healpix.Map{T, O}, obs_list::Vector{Observation}; comm=nothing, unseen=NaN) where {T <: Number, O <: Healpix.Order}
+    update_binned_map!(vec, skymap::PolarizedMap{T, O}, hitmap::Healpix.Map{T, O}, obs::Observation{T}; comm=nothing, unseen=NaN) where {T <: Number, O <: Healpix.Order}
+    update_binned_map!(skymap::PolarizedMap{T, O}, hitmap::Healpix.Map{T, O}, obs::Observation{T}; comm=nothing, unseen=NaN) where {T <: Number, O <: Healpix.Order}
+    update_binned_map!(skymap::PolarizedMap{T, O}, hitmap::Healpix.Map{T, O}, obs_list::Vector{Observation{T}}; comm=nothing, unseen=NaN) where {T <: Number, O <: Healpix.Order}
 
 Apply Eqs. (18), (19), and (20) to compute the values of I, Q, and U
 from a TOD, and save the result in `skymap` and `hitmap`.
@@ -491,7 +521,7 @@ mutable struct DestripingData{T <: Number, O <: Healpix.Order}
 
     function DestripingData{T,O}(
         nside,
-        obs_list::Vector{Observation},
+        obs_list::Vector{Observation{T}},
         runs;
         threshold = 1e-9,
         max_iterations = 1000,
@@ -628,7 +658,7 @@ function compute_z_and_subgroup!(
     vec,
     baseline_lengths,
     destriping_data::DestripingData{T, O},
-    obs::Observation;
+    obs::Observation{T};
     comm = nothing,
     unseen = missing,
 ) where {T, O <: Healpix.Order}
@@ -672,7 +702,7 @@ function compute_z_and_subgroup!(
     dest_baselines,
     baseline_lengths,
     destriping_data::DestripingData{T, O},
-    obs::Observation;
+    obs::Observation{T};
     comm = nothing,
     unseen = missing,
 ) where {T, O <: Healpix.Order}
@@ -692,10 +722,10 @@ function compute_z_and_subgroup!(
 end
 
 @doc raw"""
-    compute_z_and_subgroup!(dest_baselines, vec, baseline_lengths, destriping_data::DestripingData{T, O}, obs::Observation; comm=nothing, unseen=NaN) where {T, O <: Healpix.Order}
-    compute_z_and_subgroup!(dest_baselines, baseline_lengths, destriping_data::DestripingData{T, O}, obs::Observation; comm=nothing, unseen=NaN) where {T, O <: Healpix.Order}
+    compute_z_and_subgroup!(dest_baselines, vec, baseline_lengths, destriping_data::DestripingData{T, O}, obs::Observation{T}; comm=nothing, unseen=NaN) where {T, O <: Healpix.Order}
+    compute_z_and_subgroup!(dest_baselines, baseline_lengths, destriping_data::DestripingData{T, O}, obs::Observation{T}; comm=nothing, unseen=NaN) where {T, O <: Healpix.Order}
 
-Compute the application of matrix A in Eq. (25) in
+Compute the application of matrix ``A`` in Eq. (25) in
 KurkiSuonio2009. The result is a set of baselines, and it is saved in
 `dest_baselines` (an array of elements whose type is `T`). The two
 forms differ only in the presence of the `vec` parameter: if it is not
@@ -713,7 +743,7 @@ function compute_z_and_group!(
     vectors,
     baseline_lengths,
     destriping_data::DestripingData{T, O},
-    obs_list::Vector{Observation};
+    obs_list::Vector{Observation{T}};
     comm = nothing,
     unseen = missing,
 ) where {T, O <: Healpix.Order}
@@ -752,7 +782,7 @@ function compute_z_and_group!(
     dest_baselines,
     baseline_lengths,
     destriping_data::DestripingData{T, O},
-    obs_list::Vector{Observation};
+    obs_list::Vector{Observation{T}};
     comm = nothing,
     unseen = missing,
 ) where {T, O <: Healpix.Order}
@@ -788,10 +818,10 @@ end
 
 
 @doc raw"""
-    compute_z_and_group!(dest_baselines, vectors, baseline_lengths, destriping_data::DestripingData{T, O}, obs_list::Vector{Observation}; comm=nothing, unseen=NaN) where {T, O <: Healpix.Order}
-    compute_z_and_group!(dest_baselines, baseline_lengths, destriping_data::DestripingData{T, O}, obs_list::Vector{Observation}; comm=nothing, unseen=NaN) where {T, O <: Healpix.Order}
+    compute_z_and_group!(dest_baselines, vectors, baseline_lengths, destriping_data::DestripingData{T, O}, obs_list::Vector{Observation{T}}; comm=nothing, unseen=NaN) where {T, O <: Healpix.Order}
+    compute_z_and_group!(dest_baselines, baseline_lengths, destriping_data::DestripingData{T, O}, obs_list::Vector{Observation{T}}; comm=nothing, unseen=NaN) where {T, O <: Healpix.Order}
 
-Compute the application of matrix A in Eq. (25) in
+Compute the application of matrix ``A`` in Eq. (25) in
 KurkiSuonio2009. The result is a set of baselines, and it is saved in
 `dest_baselines` (an array of elements whose type is `T`). The two
 forms differ only in the presence of the `vec` parameter: if it is not
@@ -802,11 +832,19 @@ compute_z_and_group!
 
 ################################################################################
 
+@doc raw"""
+    compute_residuals!(residuals, baseline_lengths, destriping_data, obs_list; comm=nothing, unseen=missing)
+
+This function is used to compute the value of ``A x - b`` at the
+beginning of the Conjugated-Gradient algorithm implemented in
+[`destripe!`](@ref).
+
+"""
 function compute_residuals!(
     residuals,
     baseline_lengths,
     destriping_data::DestripingData{T, O},
-    obs_list::Vector{Observation};
+    obs_list::Vector{Observation{T}};
     comm = nothing,
     unseen = missing,
 ) where {T, O <: Healpix.Order}
@@ -918,7 +956,7 @@ TOD in `obs_list` and computes the I/Q/U maps, which are saved in
 
 """
 function calculate_cleaned_map!(
-    obs_list::Vector{Observation},
+    obs_list::Vector{Observation{T}},
     destriping_data::DestripingData{T, O};
     comm = nothing,
     unseen = missing,
@@ -1000,7 +1038,7 @@ destripe!(...)
 
 """
 function destripe!(
-    obs_list::Vector{Observation},
+    obs_list::Vector{Observation{T}},
     destriping_data::DestripingData{T, O};
     comm = nothing,
     unseen = missing,

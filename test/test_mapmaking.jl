@@ -94,15 +94,15 @@ nobs_matrix = [NobsMatrixElement() for i in 1:NPIX]
 obs_range1 = 1:sum(runs(BASELINES)[1:2])
 obs_range2 = (sum(runs(BASELINES)[1:2]) + 1):NTOD
 
-obs_list = Observation[
-    observation(
+obs_list = [
+    Observation{Float64}(
         pixidx = PIXIDX[obs_range1],
         psi_angle = PSI[obs_range1],
         tod = y[obs_range1],
         sigma_squared = diagCw[obs_range1],
         name = "Det1",
     )
-    observation(
+    Observation{Float64}(
         pixidx = PIXIDX[obs_range2],
         psi_angle = PSI[obs_range2],
         tod = y[obs_range2],
@@ -110,6 +110,11 @@ obs_list = Observation[
         name = "Det2",
     )
 ]
+
+let io = IOBuffer()
+    show(io, obs_list[1])
+    show(io, "text/plain", obs_list[2])
+end
 
 compute_nobs_matrix!(nobs_matrix, obs_list)
 
@@ -138,6 +143,13 @@ destriping_data = DestripingData{Float64, Healpix.RingOrder}(
     threshold = 1e-14,
     use_preconditioner = true,
 )
+
+# Check that the "show" method works in all its forms
+
+let io = IOBuffer()
+    show(io, destriping_data)
+    show(io, "text/plain", destriping_data)
+end
 
 compute_z_and_group!(
     dest_baselines,
