@@ -454,8 +454,28 @@ the following fields:
   preconditioner should be used or not (optional, default is
   `true`). Usually you want this to be `true`.
 
-The function [`destripe!`](@ref) use this object to return the result
-of its computation.
+The structure provides only one constructor, which accepts the
+following parameters:
+
+- `nside`: resolution of `skymap` and `hitmap`
+
+- `obs_list`: vector of [`Observation`](@ref); it is used to determine
+  which pixels in the map are going to be observed
+
+- `runs`: list of vectors (one for each element in `obs_list`),
+  containing the number of samples to be included in each baseline for
+  each observation
+
+The constructor accepts the following keywords as well:
+
+- `threshold` (default: `1e-9`)
+
+- `max_iterations` (default: 1000)
+
+- `use_preconditioner` (default: `true`)
+
+The function [`destripe!`](@ref) use `DestripingData` to return the
+result of its computation.
 
 """
 mutable struct DestripingData{T <: Number, O <: Healpix.Order}
@@ -503,11 +523,13 @@ mutable struct DestripingData{T <: Number, O <: Healpix.Order}
 
 end
 
+
+
 @doc raw"""
     reset_maps!(d::DestripingData{T, O}) where {T <: Number, O <: Healpix.Order}
 
 Set the skymap and the hitmap in `d` to zero. Nothing is done on the
-field `nobs_matrix`.
+other fields.
 
 """
 function reset_maps!(d::DestripingData{T, O}) where {T <: Number, O <: Healpix.Order}
