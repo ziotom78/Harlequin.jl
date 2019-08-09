@@ -53,14 +53,14 @@ mutable struct PolarizedMap{T, O <: Healpix.Order}
 end
 
 function PolarizedMap{T, O}(
-    i::AbstractArray{T, 1},
-    q::AbstractArray{T, 1},
-    u::AbstractArray{T, 1},
+    i::AbstractVector{T},
+    q::AbstractVector{T},
+    u::AbstractVector{T},
 ) where {T, O <: Healpix.Order}
 
     @assert length(i) == length(q)
     @assert length(i) == length(u)
-    
+
     PolarizedMap{T, O}(
         Healpix.Map{T, O}(i),
         Healpix.Map{T, O}(q),
@@ -144,7 +144,7 @@ function update_nobs!(nobs::NobsMatrixElement; threshold = 1e-7)
 end
 
 @doc raw"""
-    update_nobs_matrix!(nobs_matrix::Array{NobsMatrixElement, 1}, psi_angle, sigma_squared, pixidx, flagged)
+    update_nobs_matrix!(nobs_matrix::Vector{NobsMatrixElement}, psi_angle, sigma_squared, pixidx, flagged)
 
 Apply Eq. (10) of KurkiSuonio2009 iteratively on the samples of a TOD
 to update matrices M_p in `nobs_matrix`. The meaning of the parameters
@@ -163,7 +163,7 @@ is the following:
 
 """
 function update_nobs_matrix!(
-    nobs_matrix::Array{NobsMatrixElement, 1},
+    nobs_matrix::Vector{NobsMatrixElement},
     psi_angle,
     sigma_squared,
     pixidx,
@@ -173,7 +173,7 @@ function update_nobs_matrix!(
     @assert length(psi_angle) == length(sigma_squared)
     @assert length(psi_angle) == length(pixidx)
     @assert length(psi_angle) == length(flagged)
-    
+
     for (idx, curpix, curpsi, curflagged) in zip(
         1:length(pixidx),
         pixidx,
@@ -181,17 +181,17 @@ function update_nobs_matrix!(
         flagged,
     )
         curflagged && continue
-        
+
         constant = 1 / sigma_squared[idx]
 
         sin_term, cos_term = sincos(2 * curpsi)
         nobs_matrix[curpix].m[1, 1] += constant
         nobs_matrix[curpix].m[1, 2] += cos_term * constant
         nobs_matrix[curpix].m[1, 3] += sin_term * constant
-        
+
         nobs_matrix[curpix].m[2, 2] += cos_term^2 * constant
         nobs_matrix[curpix].m[2, 3] += cos_term * sin_term * constant
-        
+
         nobs_matrix[curpix].m[3, 3] += sin_term^2 * constant
     end
 end
@@ -233,13 +233,13 @@ and is therefore more readable.
 
 """
 mutable struct Observation
-    time::AbstractArray{Float64, 1}
-    pixidx::Array{Int, 1}
-    psi_angle::Array{Float64, 1}
+    time::AbstractVector{Float64}
+    pixidx::Vector{Int}
+    psi_angle::Vector{Float64}
 
-    tod::Array{Float64, 1}
-    sigma_squared::AbstractArray{Float64, 1}
-    flagged::AbstractArray{Bool, 1}
+    tod::Vector{Float64}
+    sigma_squared::AbstractVector{Float64}
+    flagged::AbstractVector{Bool}
 
     name::String
 end
@@ -279,7 +279,7 @@ function observation(
 end
 
 @doc raw"""
-    compute_nobs_matrix!(nobs_matrix::Array{NobsMatrixElement, 1}, observations::Array{Observation, 1})
+    compute_nobs_matrix!(nobs_matrix::Vector{NobsMatrixElement}, observations::Vector{Observation})
 
 Initialize all the elements in `nobs_matrix` so that they are the
 matrices M_p in Eq. (10) of KurkiSuonio2009. The TOD is taken from the
@@ -288,10 +288,10 @@ list of observations in the parameter `observations`.
 """
 
 function compute_nobs_matrix!(
-    nobs_matrix::Array{NobsMatrixElement, 1},
-    observations::Array{Observation, 1},
+    nobs_matrix::Vector{NobsMatrixElement},
+    observations::Vector{Observation},
 )
-    
+
     for submatrix in nobs_matrix
         submatrix.m .= 0.0
     end
@@ -367,13 +367,13 @@ function update_binned_map!(
     vec_list,
     skymap::PolarizedMap{T, O},
     hitmap::Healpix.Map{T, O},
-    obs_list::Array{Observation, 1};
+    obs_list::Vector{Observation};
     comm = nothing,
     unseen = missing,
 ) where {T <: Number, O <: Healpix.Order}
 
     @assert length(vec_list) == length(obs_list)
-    
+
     for (cur_vec, cur_obs) in zip(vec_list, obs_list)
         update_binned_map!(
             cur_vec,
@@ -389,7 +389,7 @@ end
 function update_binned_map!(
     skymap::PolarizedMap{T, O},
     hitmap::Healpix.Map{T, O},
-    obs_list::Array{Observation, 1};
+    obs_list::Vector{Observation};
     comm = nothing,
     unseen = missing,
 ) where {T <: Number, O <: Healpix.Order}
@@ -409,7 +409,7 @@ end
 @doc raw"""
     update_binned_map!(vec, skymap::PolarizedMap{T, O}, hitmap::Healpix.Map{T, O}, obs::Observation; comm=nothing, unseen=NaN) where {T <: Number, O <: Healpix.Order}
     update_binned_map!(skymap::PolarizedMap{T, O}, hitmap::Healpix.Map{T, O}, obs::Observation; comm=nothing, unseen=NaN) where {T <: Number, O <: Healpix.Order}
-    update_binned_map!(skymap::PolarizedMap{T, O}, hitmap::Healpix.Map{T, O}, obs_list::Array{Observation, 1}; comm=nothing, unseen=NaN) where {T <: Number, O <: Healpix.Order}
+    update_binned_map!(skymap::PolarizedMap{T, O}, hitmap::Healpix.Map{T, O}, obs_list::Vector{Observation}; comm=nothing, unseen=NaN) where {T <: Number, O <: Healpix.Order}
 
 Apply Eqs. (18), (19), and (20) to compute the values of I, Q, and U
 from a TOD, and save the result in `skymap` and `hitmap`.
@@ -441,16 +441,89 @@ the following fields:
 - `nobs_matrix`: an array of [`NobsMatrixelement`](@ref) objects,
   which can be used to determine which pixels were the most
   troublesome in the reconstruction of tehe I/Q/U components
+- `baselines`: the computed baselines. These must be kept as a list of
+  `RunLengthArray` objects
+- `threshold`: upper limit on the tolerable error for the Conjugated
+  Gradient method (optional, default is `1e-9`). See
+  [`calc_stopping_factor`](@ref).
+- `max_iterations`: maximum number of allowed iterations for the
+  Conjugated Gradient algorithm (optional, default is `1000`).
+- `use_preconditioner`: a Boolean flag telling whether a
+  preconditioner should be used or not (optional, default is
+  `true`). Usually you want this to be `true`.
 
-The baselines are not saved in this object; rather, they are returned
-by the function [`destripe!`](@ref).
+The function [`destripe!`](@ref) use this object to return the result
+of its computation.
 
 """
 mutable struct DestripingData{T <: Number, O <: Healpix.Order}
     skymap::PolarizedMap{T, O}
     hitmap::Healpix.Map{T, O}
-    nobs_matrix::Array{NobsMatrixElement, 1}
+    nobs_matrix::Vector{NobsMatrixElement}
+    baselines::Vector{RunLengthArray{Int, T}}
+
+    threshold::Float64
+    max_iterations::Int
+    use_preconditioner::Bool
+
+    function DestripingData{T,O}(
+        nside,
+        obs_list::Vector{Observation},
+        runs;
+        threshold = 1e-9,
+        max_iterations = 1000,
+        use_preconditioner = true,
+    ) where {T <: Number, O <: Healpix.Order}
+
+        @assert length(obs_list) == length(runs)
+        @assert threshold > 0.0
+        @assert max_iterations > 0
+
+        npix = Healpix.nside2npix(nside)
+        nobs_matrix = [NobsMatrixElement() for i in 1:npix]
+        compute_nobs_matrix!(nobs_matrix, obs_list)
+
+        new(
+            PolarizedMap{T, O}(
+                zeros(npix),
+                zeros(npix),
+                zeros(npix),
+            ),
+            Healpix.Map{T,O}(nside),
+            nobs_matrix,
+            [RunLengthArray{Int,T}(x, zeros(length(x))) for x in runs],
+            threshold,
+            max_iterations,
+            use_preconditioner,
+        )
+    end
+
 end
+
+@doc raw"""
+    configure_destriper{T,O}(nside, obs_list, runs; keywords...)
+
+Return a [`DestripingData`](@ref) object containing the configuration
+for the destriper.
+
+This is the list of valid keywords:
+
+- `T` (default: `Float64`), the data type to be used for the Healpix
+  maps produced by the destriper
+
+- `O` (default: `Healpix.RingOrder`), the ordering to be used in the
+  Healpix maps produced by the destriper
+
+- `threshold` (default: `1e-9`, refer to the documentation of
+  [`DestripingData`](@ref))
+
+- `max_iterations` (default: 1000, refer to the documentation of
+  [`DestripingData`](@ref))
+
+- `use_preconditioner` (default: `true`, refer to the documentation of
+  [`DestripingData`](@ref))
+
+"""
 
 @doc raw"""
     reset_maps!(d::DestripingData{T, O}) where {T <: Number, O <: Healpix.Order}
@@ -463,8 +536,8 @@ function reset_maps!(d::DestripingData{T, O}) where {T <: Number, O <: Healpix.O
     d.skymap.i .= 0.0
     d.skymap.q .= 0.0
     d.skymap.u .= 0.0
-    
-    d.hitmap .= 0.0    
+
+    d.hitmap .= 0.0
 end
 
 ################################################################################
@@ -495,7 +568,7 @@ function Base.iterate(iter::CleanedTOD{T}, state) where {T <: Number}
     next_tod, next_baseline = state
     next_tod = iterate(iter.tod, next_tod)
     next_baseline = iterate(iter.baselines, next_baseline)
-    
+
     next_tod === nothing && return nothing
     next_baseline == nothing && return nothing
 
@@ -519,7 +592,7 @@ function compute_z_and_subgroup!(
 
     # WARNING: unlike compute_z_and_group!, this does *not* update
     # `destriping_data`!
-    
+
     length(baseline_lengths) > 0 || return
     @assert sum(baseline_lengths) == length(obs.tod)
     @assert length(baseline_lengths) == length(dest_baselines)
@@ -529,7 +602,7 @@ function compute_z_and_subgroup!(
     @inbounds @simd for idx in eachindex(dest_baselines)
         dest_baselines[idx] = 0.0
     end
-    
+
     baseline_idx = 1
     samples_in_baseline = 0
     for (idx, sigmasamp, mapsamp) in zip(eachindex(obs.pixidx),
@@ -538,12 +611,12 @@ function compute_z_and_subgroup!(
         iqu[1] = destriping_data.skymap.i[mapsamp]
         iqu[2] = destriping_data.skymap.q[mapsamp]
         iqu[3] = destriping_data.skymap.u[mapsamp]
-        
+
         iqu .= destriping_data.nobs_matrix[mapsamp].invm * iqu
         sin_term, cos_term = sincos(2 * obs.psi_angle[idx])
         signal = (iqu[1] + iqu[2] * cos_term + iqu[3] * sin_term)
         dest_baselines[baseline_idx] += (vec[idx] - signal) / sigmasamp
-        
+
         samples_in_baseline += 1
         if samples_in_baseline == baseline_lengths[baseline_idx]
             baseline_idx += 1
@@ -563,7 +636,7 @@ function compute_z_and_subgroup!(
 
     # WARNING: unlike compute_z_and_group!, this does *not* update
     # `destriping_data`!
-    
+
     compute_z_and_group!(
         dest_baselines,
         obs.tod,
@@ -597,11 +670,11 @@ function compute_z_and_group!(
     vectors,
     baseline_lengths,
     destriping_data::DestripingData{T, O},
-    obs_list::Array{Observation, 1};
+    obs_list::Vector{Observation};
     comm = nothing,
     unseen = missing,
 ) where {T, O <: Healpix.Order}
-    
+
     @assert length(obs_list) == length(vectors)
     @assert length(obs_list) == length(baseline_lengths)
     @assert length(obs_list) == length(dest_baselines)
@@ -616,10 +689,10 @@ function compute_z_and_group!(
             unseen = unseen,
         )
     end
-    
+
     for (idx, cur_obs, cur_baseline_length) in zip(1:length(obs_list), obs_list, baseline_lengths)
         @assert length(cur_baseline_length) == length(dest_baselines[idx])
-        
+
         compute_z_and_subgroup!(
             dest_baselines[idx],
             vectors[idx],
@@ -636,14 +709,14 @@ function compute_z_and_group!(
     dest_baselines,
     baseline_lengths,
     destriping_data::DestripingData{T, O},
-    obs_list::Array{Observation, 1};
+    obs_list::Vector{Observation};
     comm = nothing,
     unseen = missing,
 ) where {T, O <: Healpix.Order}
 
     @assert length(obs_list) == length(baseline_lengths)
     @assert length(obs_list) == length(dest_baselines)
-    
+
     for cur_obs in obs_list
         update_binned_map!(
             cur_obs.tod,
@@ -657,7 +730,7 @@ function compute_z_and_group!(
 
     for (idx, cur_obs, cur_baseline_length) in zip(1:length(obs_list), obs_list, baseline_lengths)
         @assert length(cur_baseline_length) == length(dest_baselines[idx])
-        
+
         compute_z_and_subgroup!(
             dest_baselines[idx],
             cur_obs.tod,
@@ -672,8 +745,8 @@ end
 
 
 @doc raw"""
-    compute_z_and_group!(dest_baselines, vectors, baseline_lengths, destriping_data::DestripingData{T, O}, obs_list::Array{Observation, 1}; comm=nothing, unseen=NaN) where {T, O <: Healpix.Order}
-    compute_z_and_group!(dest_baselines, baseline_lengths, destriping_data::DestripingData{T, O}, obs_list::Array{Observation, 1}; comm=nothing, unseen=NaN) where {T, O <: Healpix.Order}
+    compute_z_and_group!(dest_baselines, vectors, baseline_lengths, destriping_data::DestripingData{T, O}, obs_list::Vector{Observation}; comm=nothing, unseen=NaN) where {T, O <: Healpix.Order}
+    compute_z_and_group!(dest_baselines, baseline_lengths, destriping_data::DestripingData{T, O}, obs_list::Vector{Observation}; comm=nothing, unseen=NaN) where {T, O <: Healpix.Order}
 
 Compute the application of matrix A in Eq. (25) in
 KurkiSuonio2009. The result is a set of baselines, and it is saved in
@@ -688,19 +761,18 @@ compute_z_and_group!
 
 function compute_residuals!(
     residuals,
-    baselines,
     baseline_lengths,
     destriping_data::DestripingData{T, O},
-    obs_list::Array{Observation, 1};
+    obs_list::Vector{Observation};
     comm = nothing,
     unseen = missing,
 ) where {T, O <: Healpix.Order}
 
     @assert length(residuals) == length(obs_list)
     @assert length(residuals) == length(baseline_lengths)
-    
+
     reset_maps!(destriping_data)
-    
+
     compute_z_and_group!(
         residuals,
         baseline_lengths,
@@ -709,12 +781,12 @@ function compute_residuals!(
     )
 
     left_side = [Array{T}(undef, length(residuals[idx])) for idx in 1:length(residuals)]
-    
+
     reset_maps!(destriping_data)
-    
+
     compute_z_and_group!(
-        left_side, 
-        baselines,
+        left_side,
+        destriping_data.baselines,
         baseline_lengths,
         destriping_data,
         obs_list,
@@ -728,7 +800,7 @@ function array_dot(
     y;
     comm = nothing,
 ) where {N <: Integer, T <: Number}
-    
+
     @assert length(x) == length(y)
 
     result = 0.0
@@ -795,7 +867,7 @@ function apply_offset_to_baselines!(
 end
 
 @doc raw"""
-    calculate_cleaned_map!(obs_list, baselines, destriping_data; comm=nothing, unseen=missing)
+    calculate_cleaned_map!(obs_list, destriping_data; comm=nothing, unseen=missing)
 
 Provided a set of baselines in `baselines`, this function cleans the
 TOD in `obs_list` and computes the I/Q/U maps, which are saved in
@@ -803,17 +875,16 @@ TOD in `obs_list` and computes the I/Q/U maps, which are saved in
 
 """
 function calculate_cleaned_map!(
-    obs_list::Array{Observation, 1},
-    baselines::Array{RunLengthArray{Int, T}, 1},
+    obs_list::Vector{Observation},
     destriping_data::DestripingData{T, O};
     comm = nothing,
     unseen = missing,
 ) where {T <: Number, O <: Healpix.Order}
-    
+
     cleaned_tod = CleanedTOD{Float64}([], [])
     reset_maps!(destriping_data)
-    
-    for (cur_obs, cur_baseline) in zip(obs_list, baselines)
+
+    for (cur_obs, cur_baseline) in zip(obs_list, destriping_data.baselines)
         cleaned_tod.tod = cur_obs.tod
         cleaned_tod.baselines = cur_baseline
 
@@ -847,7 +918,7 @@ include("preconditioners.jl")
 include("covmatrix.jl")
 
 @doc raw"""
-    destripe!(obs_list, baselines, destriping_data; threshold, max_iterations, comm, unseen, callback, use_preconditioner) where {T <: Number, O <: Healpix.Order}
+    destripe!(obs_list, destriping_data; comm, unseen, callback) where {T <: Number, O <: Healpix.Order}
 
 Apply the destriping algorithm to the TOD in `obs_list`. The result is
 returned in `baselines` (set of baselines) and `destriping_data`
@@ -856,17 +927,11 @@ returned in `baselines` (set of baselines) and `destriping_data`
 The parameters must satisfy the following constraints:
 
 - `obs_list` must be an array of `N` [`Observation`](@ref) objects;
-- `baselines` must be an array of `N` `RunLengthArray` objects; each
-  of them must have all the values set to zero; the length of each run
-  specifies the length of the baseline in terms of the samples in the
-  TOD in `obs_list`
 - `destriping_data` must be a [`DestripingData`](@ref) object. It does
   not need to have been initialized using [`reset_maps!`](@ref).
 
 The optional keyword have the following meaning and default value:
 
-- `max_iterations` is the maximum number of allowed iterations for the
-  Conjugated Gradient algorithm. The default is 1000.
 - `comm` is a MPI communicator object, or `nothing` is MPI is not
   used.
 - `unseen` is the value to be used for pixels in the map that have not
@@ -879,9 +944,8 @@ The optional keyword have the following meaning and default value:
   function must accept the following parameters:
 
   1. Iteration number, starting from 1
-  2. Maximum number of iterations, equal to `max_iterations`
-  3. Current stopping factor
-  4. The value of `destriping_data`
+  2. Current stopping factor
+  3. The value of `destriping_data`
 
 The function uses Julia's `Logging` module. Therefore, you can enable
 the output of diagnostic messages, like in the following example:
@@ -895,30 +959,27 @@ destripe!(...)
 
 """
 function destripe!(
-    obs_list::Array{Observation, 1},
-    baselines::Array{RunLengthArray{Int, T}, 1},
+    obs_list::Vector{Observation},
     destriping_data::DestripingData{T, O};
-    threshold = 1e-9,
-    max_iterations = 1000,
     comm = nothing,
     unseen = missing,
     callback = nothing,
-    use_preconditioner = true,
 ) where {T <: Number, O <: Healpix.Order}
 
-    @assert length(obs_list) == length(baselines)
+    @assert length(obs_list) == length(destriping_data.baselines)
 
     # This variable is not going to change during the execution of the function
-    baseline_lengths = [runs(baselines[idx]) for idx in 1:length(obs_list)]
+    baseline_lengths = [runs(destriping_data.baselines[idx])
+                        for idx in 1:length(obs_list)]
 
-    r = [Array{T}(undef, length(values(baselines[idx]))) for idx in 1:length(obs_list)]
+    r = [Array{T}(undef, length(values(destriping_data.baselines[idx])))
+         for idx in 1:length(obs_list)]
     rnext = deepcopy(r)
 
     compute_nobs_matrix!(destriping_data.nobs_matrix, obs_list)
-    
+
     compute_residuals!(
         r,
-        baselines,
         baseline_lengths,
         destriping_data,
         obs_list,
@@ -928,36 +989,37 @@ function destripe!(
     k = 0
 
     list_of_stopping_factors = []
-    
+
     stopping_factor = calc_stopping_factor(r, comm = comm)
     push!(list_of_stopping_factors, stopping_factor)
-    stopping_factor < threshold && return list_of_stopping_factors
+    stopping_factor < destriping_data.threshold && return list_of_stopping_factors
 
-    precond = if use_preconditioner
+    precond = if destriping_data.use_preconditioner
         jacobi_preconditioner(
-            [runs(b) for b in baselines],
+            [runs(b) for b in destriping_data.baselines],
             T
         )
     else
         IdentityPreconditioner()
     end
-    
+
     z = deepcopy(r)
     apply!(precond, z)
 
     old_z_dot_r = array_dot(z, r, comm = comm)
-    p = [RunLengthArray{Int, T}(runs(baselines[idx]), z[idx]) for idx in 1:length(baselines)]
+    p = [RunLengthArray{Int, T}(runs(destriping_data.baselines[idx]), z[idx])
+         for idx in 1:length(destriping_data.baselines)]
     best_stopping_factor = stopping_factor
-    best_a = deepcopy(baselines)
+    best_a = deepcopy(destriping_data.baselines)
 
     ap = [Array{T}(undef, length(r[idx])) for idx in 1:length(r)]
     while true
         k += 1
-        @debug "CG iteration $k/$max_iterations, stopping factor = $stopping_factor"
-        
-        if k >= max_iterations
+        @debug "CG iteration $k/$(destriping_data.max_iterations), stopping factor = $stopping_factor"
+
+        if k >= destriping_data.max_iterations
             @warn "The destriper did not converge after $k iterations"
-            baselines = best_a
+            destriping_data.baselines = best_a
             break
         end
 
@@ -973,20 +1035,20 @@ function destripe!(
         )
         γ = old_z_dot_r / array_dot(p, ap, comm = comm)
         for obsidx in 1:length(obs_list)
-            baselines[obsidx].values .+= γ * p[obsidx].values
+            destriping_data.baselines[obsidx].values .+= γ * p[obsidx].values
             rnext[obsidx] .= r[obsidx] - γ * ap[obsidx]
         end
         # Remove the mean value from the baselines
-        apply_offset_to_baselines!(baselines)
+        apply_offset_to_baselines!(destriping_data.baselines)
 
         stopping_factor = calc_stopping_factor(r, comm = comm)
         push!(list_of_stopping_factors, stopping_factor)
         if stopping_factor < best_stopping_factor
-            best_a = deepcopy(baselines)
+            best_a = deepcopy(destriping_data.baselines)
             best_stopping_factor = stopping_factor
         end
-        if stopping_factor < threshold
-            @info "Destriper converged after $k iterations, stopping factor ($(stopping_factor)) < threshold ($(threshold))"
+        if stopping_factor < destriping_data.threshold
+            @info "Destriper converged after $k iterations, stopping factor ($(stopping_factor)) < threshold ($(destriping_data.threshold))"
             break
         end
 
@@ -999,12 +1061,12 @@ function destripe!(
             p[obsidx].values .= z[obsidx] + (new_z_dot_r / old_z_dot_r) * p[obsidx].values
         end
 
-        (callback === nothing) || callback(k, max_iterations, stopping_factor, destriping_data)
+        (callback === nothing) || callback(k, stopping_factor, destriping_data)
         old_z_dot_r = new_z_dot_r
     end
 
     @debug "Producing the map"
-    calculate_cleaned_map!(obs_list, baselines, destriping_data, comm = comm, unseen = unseen)
+    calculate_cleaned_map!(obs_list, destriping_data, comm = comm, unseen = unseen)
 
     list_of_stopping_factors
 end

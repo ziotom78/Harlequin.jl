@@ -130,14 +130,13 @@ dest_baselines = [
     Float64[0.0, 0.0],
 ]
 
-destriping_data = DestripingData(
-    PolarizedMap{Float64, Healpix.RingOrder}(
-        zeros(12),
-        zeros(12),
-        zeros(12),
-    ),
-    Healpix.Map{Float64, Healpix.RingOrder}(1),
-    nobs_matrix,
+destriping_data = DestripingData{Float64, Healpix.RingOrder}(
+    1,
+    obs_list,
+    [runs(BASELINES)[1:2], runs(BASELINES)[3:4]],
+    max_iterations = 15,
+    threshold = 1e-14,
+    use_preconditioner = true,
 )
 
 compute_z_and_group!(
@@ -167,21 +166,13 @@ compute_z_and_group!(
 @test collect(Iterators.flatten(left_side)) ≈ A * values(BASELINES)
 
 reset_maps!(destriping_data)
-start_baselines = [
-    RunLengthArray{Int,Float64}(runs(BASELINES)[1:2], [0.0, 0.0]),
-    RunLengthArray{Int,Float64}(runs(BASELINES)[3:4], [0.0, 0.0]),
-]
 
 destripe!(
     obs_list,
-    start_baselines,
     destriping_data,
-    max_iterations = 15,
-    threshold = 1e-14,
-    use_preconditioner = true,
 )
 
-estimated_baselines = collect(Iterators.flatten([x.values for x in start_baselines]))
+estimated_baselines = collect(Iterators.flatten([x.values for x in destriping_data.baselines]))
 @test estimated_baselines ≈ collect(BASELINES.values)
 
 @test (abs.(destriping_data.skymap.i .- skymap.i) |> maximum) < 0.3
