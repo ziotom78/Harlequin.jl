@@ -69,22 +69,26 @@ mutable struct Observation{T <: Real}
         name = "unnamed",
     ) where {T <: Real}
         @assert !isempty(pixidx)
-        @assert length(psi_angle) == length(pixidx)
-        @assert length(tod) == length(pixidx)
 
-        int_time = isempty(time) ? (0:(length(tod) - 1)) : time
-        int_sigma_squared = isempty(sigma_squared) ? RunLengthArray{Int,T}(length(tod), 1.0) : sigma_squared
-        int_flagged = isempty(flagged) ? zeros(Bool, length(tod)) : flagged
+        nsamples = length(pixidx)
+        
+        int_time = isempty(time) ? (0:(nsamples - 1)) : time
+        int_tod = isempty(tod) ? zeros(T, nsamples) : tod
+        int_psi_angle = isempty(psi_angle) ? zeros(T, nsamples) : psi_angle
+        int_sigma_squared = isempty(sigma_squared) ? RunLengthArray{Int,T}(nsamples, 1.0) : sigma_squared
+        int_flagged = isempty(flagged) ? zeros(Bool, nsamples) : flagged
 
-        @assert length(int_time) == length(pixidx)
-        @assert length(int_sigma_squared) == length(pixidx)
-        @assert length(int_flagged) == length(pixidx)
+        @assert length(int_time) == nsamples
+        @assert length(int_psi_angle) == nsamples
+        @assert length(int_tod) == nsamples
+        @assert length(int_sigma_squared) == nsamples
+        @assert length(int_flagged) == nsamples
 
         new(
             int_time,
             pixidx,
-            psi_angle,
-            tod,
+            int_psi_angle,
+            int_tod,
             int_sigma_squared,
             int_flagged,
             name,
@@ -93,7 +97,7 @@ mutable struct Observation{T <: Real}
 end
 
 function Base.show(io::IO, obs::Observation)
-    print(io, "Observation(name => $(obs.name), samples = $(length(obs.time))")
+    print(io, "Observation(name => \"$(obs.name)\", samples = $(length(obs.time)))")
 end
 
 function Base.show(io::IO, ::MIME"text/plain", obs::Observation)

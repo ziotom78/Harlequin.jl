@@ -1,3 +1,5 @@
+using RecipesBase
+
 ################################################################################
 # Destriping results
 
@@ -54,7 +56,7 @@ result of its computation.
 mutable struct DestripingData{T <: Real, O <: Healpix.Order}
     skymap::PolarizedMap{T, O}
     hitmap::Healpix.Map{T, O}
-    nobs_matrix::Vector{NobsMatrixElement}
+    nobs_matrix::Vector{NobsMatrixElement{T}}
     baselines::Vector{RunLengthArray{Int, T}}
     stopping_factors::Vector{T}
     threshold::Float64
@@ -75,7 +77,7 @@ mutable struct DestripingData{T <: Real, O <: Healpix.Order}
         @assert max_iterations > 0
 
         npix = Healpix.nside2npix(nside)
-        nobs_matrix = [NobsMatrixElement() for i in 1:npix]
+        nobs_matrix = [NobsMatrixElement{T}() for i in 1:npix]
         compute_nobs_matrix!(nobs_matrix, obs_list)
 
         new(
@@ -154,3 +156,29 @@ function reset_maps!(d::DestripingData{T, O}) where {T <: Real, O <: Healpix.Ord
 
     d.hitmap .= 0.0
 end
+
+@recipe function plot_destriping_data(d::DestripingData{T, O}) where {T <: Real, O <: Healpix.Order}
+    seriestype := :path
+    xlabel := "Iteration number"
+    ylabel := "Stopping factor"
+    linecolor := :black
+    
+    isempty(d.stopping_factors) && return ([0.0], [0.0])
+    num_of_steps = length(d.stopping_factors)
+
+    @series begin
+        # Horizontal line showing the threshold
+        seriestype := :path
+        linecolor := :red
+        ([1, num_of_steps], [d.threshold, d.threshold])
+    end
+
+    ((1:num_of_steps), d.stopping_factors)
+end
+
+@doc raw"""
+    plot(d::DestripingData{T, O}) where {T <: Real, O <: Healpix.Order}
+
+Plot the convergence plot for a destriping solution.
+"""
+plot_destriping_data

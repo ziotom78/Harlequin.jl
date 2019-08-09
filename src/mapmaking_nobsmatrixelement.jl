@@ -33,30 +33,30 @@ update_nobs_matrix!(nobs_matrix, psi_angle, sigma_squared, pixidx, flagged)
 ```
 
 """
-mutable struct NobsMatrixElement
+mutable struct NobsMatrixElement{T <: Real}
     # We do not define "m" as symmetric, as we want to update its
     # fields one by one; however, we only consider the upper part
-    m::Array{Float64, 2}
-    invm::Symmetric{Float64, Array{Float64, 2}}
-    invcond::Float64
+    m::Array{T, 2}
+    invm::Symmetric{T, Array{T, 2}}
+    invcond::T
 
     # If "true", do not consider this pixel in the solution, as it was
     # not covered enough by the scanning strategy
     neglected::Bool
 
-    NobsMatrixElement() = new(
-        Symmetric(zeros(Float64, 3, 3)),
-        Symmetric(zeros(Float64, 3, 3)),
+    NobsMatrixElement{T}() where {T <: Real} = new(
+        Symmetric(zeros(T, 3, 3)),
+        Symmetric(zeros(T, 3, 3)),
         0.0,
         true,
     )
 end
 
-function Base.show(io::IO, nobsmatr::NobsMatrixElement)
+function Base.show(io::IO, nobsmatr::NobsMatrixElement{T}) where {T <: Real}
     print(io, "NobsMatrixElement(invcond => $(nobsmatr.invcond), neglected => $(nobsmatr.neglected))")
 end
 
-function Base.show(io::IO, ::MIME"text/plain", nobsmatr::NobsMatrixElement)
+function Base.show(io::IO, ::MIME"text/plain", nobsmatr::NobsMatrixElement{T}) where {T <: Real}
     println(
         io,
         @sprintf(
@@ -85,14 +85,14 @@ Inverse matrix:
 end
 
 @doc raw"""
-    update_nobs!(nobs::NobsMatrixElement; threshold = 1e-7)
+    update_nobs!(nobs::NobsMatrixElement{T}; threshold = 1e-7)
 
 This function makes sure that all the elements in `nobs` are
 synchronized. It should be called whenever the field `nobs.m` (matrix
 M_p in Eq. 10 of KurkiSuonio2009) has changed.
 
 """
-function update_nobs!(nobs::NobsMatrixElement; threshold = 1e-7)
+function update_nobs!(nobs::NobsMatrixElement{T}; threshold = 1e-7) where {T <: Real}
     c = cond(nobs.m)
 
     if isfinite(c)
@@ -106,7 +106,7 @@ function update_nobs!(nobs::NobsMatrixElement; threshold = 1e-7)
 end
 
 @doc raw"""
-    update_nobs_matrix!(nobs_matrix::Vector{NobsMatrixElement}, psi_angle, sigma_squared, pixidx, flagged)
+    update_nobs_matrix!(nobs_matrix::Vector{NobsMatrixElement{T}}, psi_angle, sigma_squared, pixidx, flagged)
 
 Apply Eq. (10) of KurkiSuonio2009 iteratively on the samples of a TOD
 to update matrices ``M_p`` in `nobs_matrix`. The meaning of the
@@ -125,12 +125,12 @@ parameters is the following:
 
 """
 function update_nobs_matrix!(
-    nobs_matrix::Vector{NobsMatrixElement},
+    nobs_matrix::Vector{NobsMatrixElement{T}},
     psi_angle,
     sigma_squared,
     pixidx,
     flagged,
-)
+) where {T <: Real}
 
     @assert length(psi_angle) == length(sigma_squared)
     @assert length(psi_angle) == length(pixidx)

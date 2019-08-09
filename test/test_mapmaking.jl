@@ -89,7 +89,7 @@ map_guess = inv(P' * invCw * P) * P' * invCw * (y - F * baseline_guess)
 time_samp = 0.01 # Integration time for one sample; it is not really used
 
 # This holds the same information as matrix M = P' ⋅ Cw^-1 ⋅ P
-nobs_matrix = [NobsMatrixElement() for i in 1:NPIX]
+nobs_matrix = [NobsMatrixElement{Float64}() for i in 1:NPIX]
 
 obs_range1 = 1:sum(runs(BASELINES)[1:2])
 obs_range2 = (sum(runs(BASELINES)[1:2]) + 1):NTOD

@@ -90,9 +90,9 @@ list of observations in the parameter `observations`.
 
 """
 function compute_nobs_matrix!(
-    nobs_matrix::Vector{NobsMatrixElement},
+    nobs_matrix::Vector{NobsMatrixElement{T}},
     observations::Vector{Observation{T}},
-) where {T}
+) where {T <: Real}
 
     for submatrix in nobs_matrix
         submatrix.m .= 0.0
