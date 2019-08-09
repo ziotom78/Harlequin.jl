@@ -118,6 +118,12 @@ end
 
 compute_nobs_matrix!(nobs_matrix, obs_list)
 
+# Test that NobsMatrixElement objects can be showed
+let io = IOBuffer()
+    show(io, nobs_matrix[1])
+    show(io, "text/plain", nobs_matrix[1])
+end
+
 # Verify that nobs_matrix is really a representation of matrix M
 for i in 1:NPIX
     startidx = 1 + 3(i - 1)

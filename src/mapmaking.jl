@@ -123,6 +123,38 @@ mutable struct NobsMatrixElement
     )
 end
 
+function Base.show(io::IO, nobsmatr::NobsMatrixElement)
+    print(io, "NobsMatrixElement(invcond => $(nobsmatr.invcond), neglected => $(nobsmatr.neglected))")
+end
+
+function Base.show(io::IO, ::MIME"text/plain", nobsmatr::NobsMatrixElement)
+    println(
+        io,
+        @sprintf(
+            """NobsMatrixElement:
+Inverse condition number.......... %e
+Neglected......................... %s
+Matrix:
+    %.5f   %.5f   %.5f
+    %.5f   %.5f   %.5f
+    %.5f   %.5f   %.5f
+Inverse matrix:
+    %.5f   %.5f   %.5f
+    %.5f   %.5f   %.5f
+    %.5f   %.5f   %.5f
+    """,
+            nobsmatr.invcond,
+            nobsmatr.neglected,
+            nobsmatr.m[1, 1], nobsmatr.m[1, 2], nobsmatr.m[1, 3],
+            nobsmatr.m[2, 1], nobsmatr.m[2, 2], nobsmatr.m[2, 3],
+            nobsmatr.m[3, 1], nobsmatr.m[3, 2], nobsmatr.m[3, 3],
+            nobsmatr.invm[1, 1], nobsmatr.invm[1, 2], nobsmatr.invm[1, 3],
+            nobsmatr.invm[2, 1], nobsmatr.invm[2, 2], nobsmatr.invm[2, 3],
+            nobsmatr.invm[3, 1], nobsmatr.invm[3, 2], nobsmatr.invm[3, 3],
+        )
+    )
+end
+
 @doc raw"""
     update_nobs!(nobs::NobsMatrixElement; threshold = 1e-7)
 
@@ -197,118 +229,7 @@ function update_nobs_matrix!(
     end
 end
 
-################################################################################
-# Observations
-
-@doc raw"""
-    mutable struct Observation
-
-An *observation* is a sequence of time-ordered data (TOD) that has
-been acquired by some detector. It implements the following fields:
-
-- `time`: an array of `N` elements, representing the time of the
-  sample. Being defined as an `AbstractArray`, a range (e.g.,
-  `0.0:0.1:3600.0`) can be used to save memory
-- `pixidx`: an array of `N` elements, each being a pixel index in a
-  map. In no way the Healpix pixelization scheme is enforced; in fact,
-  the map must not even be spherical.
-- `psi_angle`: an array of `N` elements, each containing the
-  orientation of the polarization angle with respect to some fixed
-  reference system (e.g., the Ecliptic plane). The angles must be in
-  **radians**.
-- `tod`: an array of `N` elements, containing the actual data measured
-  by the instrument and already calibrated to some physical units
-  (e.g., K_CMB)
-- `sigma_squared`: an array of `N` elements, containing the squared
-  RMS of each sample. To save memory, you should usually use a
-  `RunLengthArray` here.
-- `flagged`: a Boolean array of `N` elements, telling whether the
-  sample should be discarded (`true`) or not (`false`) during the
-  map-making process.
-- `name`: a string representing the detector. This is used only for
-  debugging purposes.
-
-To create an observation, you can use the function
-[`observation`](@ref), which accepts keyword arguments as parameters
-and is therefore more readable.
-
-"""
-mutable struct Observation{T <: Number}
-    time::AbstractVector{T}
-    pixidx::Vector{Int}
-    psi_angle::Vector{T}
-
-    tod::Vector{T}
-    sigma_squared::AbstractVector{T}
-    flagged::AbstractVector{Bool}
-
-    name::String
-    
-    function Observation{T}(
-        ;
-        time = T[],
-        pixidx = Int[],
-        psi_angle = T[],
-        tod = T[],
-        sigma_squared = T[],
-        flagged = Bool[],
-        name = "unnamed",
-    ) where {T <: Number}
-        @assert !isempty(pixidx)
-        @assert length(psi_angle) == length(pixidx)
-        @assert length(tod) == length(pixidx)
-
-        int_time = isempty(time) ? (0:(length(tod) - 1)) : time
-        int_sigma_squared = isempty(sigma_squared) ? ones(T, length(tod)) : sigma_squared
-        int_flagged = isempty(flagged) ? zeros(Bool, length(tod)) : flagged
-
-        @assert length(int_time) == length(pixidx)
-        @assert length(int_sigma_squared) == length(pixidx)
-        @assert length(int_flagged) == length(pixidx)
-
-        new(
-            int_time,
-            pixidx,
-            psi_angle,
-            tod,
-            int_sigma_squared,
-            int_flagged,
-            name,
-        )
-    end
-end
-
-function Base.show(io::IO, obs::Observation)
-    print(io, "Observation(name => $(obs.name), samples = $(length(obs.time))")
-end
-
-function Base.show(io::IO, ::MIME"text/plain", obs::Observation)
-
-    isempty(obs.time) && println(io, "Observation for detector %(obs.name): empty")
-    
-    println(
-        io,
-        @sprintf(
-            """Observation for detector %s:
-Number of samples....................... %d
-Start time.............................. %f
-Duration................................ %f
-Number of flagged samples............... %d (%.1f%%)
-Average level of the TOD................ %e
-Average noise^2 level................... %e
-""",
-            obs.name,
-            length(obs.time),
-            obs.time[1],
-            obs.time[end] - obs.time[1],
-            length(obs.flagged[obs.flagged]),
-            100 * length(obs.flagged[obs.flagged]) / length(obs.flagged),
-            mean(obs.tod),
-            mean(obs.sigma_squared),
-        )
-    )
-end
-
+include("mapmaking_observations.jl")
 
 @doc raw"""
     compute_nobs_matrix!(nobs_matrix::Vector{NobsMatrixElement}, observations::Vector{Observation{T}})
@@ -351,7 +272,7 @@ function update_binned_map!(
     obs::Observation{T};
     comm = nothing,
     unseen = missing,
-) where {T <: Number, O <: Healpix.Order}
+) where {T <: Real, O <: Healpix.Order}
 
     # We use "zip" to iterate over those arrays that might not be
     # plain Julia Arrays
@@ -382,7 +303,7 @@ function update_binned_map!(
     obs::Observation{T};
     comm = nothing,
     unseen = missing,
-) where {T <: Number, O <: Healpix.Order}
+) where {T <: Real, O <: Healpix.Order}
 
     update_binned_map!(
         obs.tod,
@@ -401,7 +322,7 @@ function update_binned_map!(
     obs_list::Vector{Observation{T}};
     comm = nothing,
     unseen = missing,
-) where {T <: Number, O <: Healpix.Order}
+) where {T <: Real, O <: Healpix.Order}
 
     @assert length(vec_list) == length(obs_list)
 
@@ -423,7 +344,7 @@ function update_binned_map!(
     obs_list::Vector{Observation{T}};
     comm = nothing,
     unseen = missing,
-) where {T <: Number, O <: Healpix.Order}
+) where {T <: Real, O <: Healpix.Order}
 
     for cur_obs in obs_list
         update_binned_map!(
@@ -438,9 +359,9 @@ end
 
 
 @doc raw"""
-    update_binned_map!(vec, skymap::PolarizedMap{T, O}, hitmap::Healpix.Map{T, O}, obs::Observation{T}; comm=nothing, unseen=NaN) where {T <: Number, O <: Healpix.Order}
-    update_binned_map!(skymap::PolarizedMap{T, O}, hitmap::Healpix.Map{T, O}, obs::Observation{T}; comm=nothing, unseen=NaN) where {T <: Number, O <: Healpix.Order}
-    update_binned_map!(skymap::PolarizedMap{T, O}, hitmap::Healpix.Map{T, O}, obs_list::Vector{Observation{T}}; comm=nothing, unseen=NaN) where {T <: Number, O <: Healpix.Order}
+    update_binned_map!(vec, skymap::PolarizedMap{T, O}, hitmap::Healpix.Map{T, O}, obs::Observation{T}; comm=nothing, unseen=NaN) where {T <: Real, O <: Healpix.Order}
+    update_binned_map!(skymap::PolarizedMap{T, O}, hitmap::Healpix.Map{T, O}, obs::Observation{T}; comm=nothing, unseen=NaN) where {T <: Real, O <: Healpix.Order}
+    update_binned_map!(skymap::PolarizedMap{T, O}, hitmap::Healpix.Map{T, O}, obs_list::Vector{Observation{T}}; comm=nothing, unseen=NaN) where {T <: Real, O <: Healpix.Order}
 
 Apply Eqs. (18), (19), and (20) to compute the values of I, Q, and U
 from a TOD, and save the result in `skymap` and `hitmap`.
@@ -460,7 +381,7 @@ update_binned_map!
 # Destriping results
 
 @doc raw"""
-    mutable struct DestripingData{T <: Number, O <: Healpix.Order}
+    mutable struct DestripingData{T <: Real, O <: Healpix.Order}
 
 Structure containing the result of a destriping operation. It contains
 the following fields:
@@ -509,7 +430,7 @@ The function [`destripe!`](@ref) use `DestripingData` to return the
 result of its computation.
 
 """
-mutable struct DestripingData{T <: Number, O <: Healpix.Order}
+mutable struct DestripingData{T <: Real, O <: Healpix.Order}
     skymap::PolarizedMap{T, O}
     hitmap::Healpix.Map{T, O}
     nobs_matrix::Vector{NobsMatrixElement}
@@ -526,7 +447,7 @@ mutable struct DestripingData{T <: Number, O <: Healpix.Order}
         threshold = 1e-9,
         max_iterations = 1000,
         use_preconditioner = true,
-    ) where {T <: Number, O <: Healpix.Order}
+    ) where {T <: Real, O <: Healpix.Order}
 
         @assert length(obs_list) == length(runs)
         @assert threshold > 0.0
@@ -599,13 +520,13 @@ end
 
 
 @doc raw"""
-    reset_maps!(d::DestripingData{T, O}) where {T <: Number, O <: Healpix.Order}
+    reset_maps!(d::DestripingData{T, O}) where {T <: Real, O <: Healpix.Order}
 
 Set the skymap and the hitmap in `d` to zero. Nothing is done on the
 other fields.
 
 """
-function reset_maps!(d::DestripingData{T, O}) where {T <: Number, O <: Healpix.Order}
+function reset_maps!(d::DestripingData{T, O}) where {T <: Real, O <: Healpix.Order}
     d.skymap.i .= 0.0
     d.skymap.q .= 0.0
     d.skymap.u .= 0.0
@@ -616,7 +537,7 @@ end
 ################################################################################
 
 @doc raw"""
-    mutable struct CleanedTOD{T <: Number}
+    mutable struct CleanedTOD{T <: Real}
 
 This structure is used to associated a TOD containing some measurement
 with the set of baselines estimated by the destriper. It implements
@@ -624,12 +545,12 @@ the iterator interface, which means that it can be used like if it
 were an array.
 
 """
-mutable struct CleanedTOD{T <: Number}
+mutable struct CleanedTOD{T <: Real}
     tod::AbstractArray{T,1}
     baselines::AbstractArray{T,1}
 end
 
-function Base.iterate(iter::CleanedTOD{T}) where {T <: Number}
+function Base.iterate(iter::CleanedTOD{T}) where {T <: Real}
     isempty(iter.tod) && return nothing
 
     first_tod, tod_iter = iterate(iter.tod)
@@ -637,7 +558,7 @@ function Base.iterate(iter::CleanedTOD{T}) where {T <: Number}
     (first_tod - first_baseline, (tod_iter, baseline_iter))
 end
 
-function Base.iterate(iter::CleanedTOD{T}, state) where {T <: Number}
+function Base.iterate(iter::CleanedTOD{T}, state) where {T <: Real}
     next_tod, next_baseline = state
     next_tod = iterate(iter.tod, next_tod)
     next_baseline = iterate(iter.baselines, next_baseline)
@@ -648,8 +569,8 @@ function Base.iterate(iter::CleanedTOD{T}, state) where {T <: Number}
     (next_tod[1] - next_baseline[1], (next_tod[2], next_baseline[2]))
 end
 
-Base.getindex(c::CleanedTOD{T}, idx) where {T <: Number} = c.tod[idx] - c.baselines[idx]
-Base.length(c::CleanedTOD{T}) where {T <: Number} = length(c.tod)
+Base.getindex(c::CleanedTOD{T}, idx) where {T <: Real} = c.tod[idx] - c.baselines[idx]
+Base.length(c::CleanedTOD{T}) where {T <: Real} = length(c.tod)
 
 ################################################################################
 
@@ -880,7 +801,7 @@ function array_dot(
     x::Array{RunLengthArray{N, T}},
     y;
     comm = nothing,
-) where {N <: Integer, T <: Number}
+) where {N <: Integer, T <: Real}
 
     @assert length(x) == length(y)
 
@@ -932,7 +853,7 @@ Add a constant offset to all the baselines such that their sum is zero.
 """
 function apply_offset_to_baselines!(
     baselines::Array{RunLengthArray{Int, T}, 1},
-) where {T <: Number}
+) where {T <: Real}
 
     baseline_sum = 0.0
     baseline_num = 0
@@ -960,7 +881,7 @@ function calculate_cleaned_map!(
     destriping_data::DestripingData{T, O};
     comm = nothing,
     unseen = missing,
-) where {T <: Number, O <: Healpix.Order}
+) where {T <: Real, O <: Healpix.Order}
 
     cleaned_tod = CleanedTOD{Float64}([], [])
     reset_maps!(destriping_data)
@@ -994,12 +915,11 @@ function calculate_cleaned_map!(
     end
 end
 
-include("preconditioners.jl")
-
-include("covmatrix.jl")
+include("mapmaking_preconditioners.jl")
+include("mapmaking_covmatrix.jl")
 
 @doc raw"""
-    destripe!(obs_list, destriping_data::DestripingData{T,O}; comm, unseen, callback) where {T <: Number, O <: Healpix.Order}
+    destripe!(obs_list, destriping_data::DestripingData{T,O}; comm, unseen, callback) where {T <: Real, O <: Healpix.Order}
 
 Apply the destriping algorithm to the TOD in `obs_list`. The result is
 returned in `destriping_data`, which is of type
@@ -1043,7 +963,7 @@ function destripe!(
     comm = nothing,
     unseen = missing,
     callback = nothing,
-) where {T <: Number, O <: Healpix.Order}
+) where {T <: Real, O <: Healpix.Order}
 
     @assert length(obs_list) == length(destriping_data.baselines)
 
