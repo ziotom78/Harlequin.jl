@@ -504,31 +504,6 @@ mutable struct DestripingData{T <: Number, O <: Healpix.Order}
 end
 
 @doc raw"""
-    configure_destriper{T,O}(nside, obs_list, runs; keywords...)
-
-Return a [`DestripingData`](@ref) object containing the configuration
-for the destriper.
-
-This is the list of valid keywords:
-
-- `T` (default: `Float64`), the data type to be used for the Healpix
-  maps produced by the destriper
-
-- `O` (default: `Healpix.RingOrder`), the ordering to be used in the
-  Healpix maps produced by the destriper
-
-- `threshold` (default: `1e-9`, refer to the documentation of
-  [`DestripingData`](@ref))
-
-- `max_iterations` (default: 1000, refer to the documentation of
-  [`DestripingData`](@ref))
-
-- `use_preconditioner` (default: `true`, refer to the documentation of
-  [`DestripingData`](@ref))
-
-"""
-
-@doc raw"""
     reset_maps!(d::DestripingData{T, O}) where {T <: Number, O <: Healpix.Order}
 
 Set the skymap and the hitmap in `d` to zero. Nothing is done on the
