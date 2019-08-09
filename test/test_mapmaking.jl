@@ -89,20 +89,20 @@ map_guess = inv(P' * invCw * P) * P' * invCw * (y - F * baseline_guess)
 time_samp = 0.01 # Integration time for one sample; it is not really used
 
 # This holds the same information as matrix M = P' ⋅ Cw^-1 ⋅ P
-nobs_matrix = [NobsMatrixElement() for i in 1:NPIX]
+nobs_matrix = [NobsMatrixElement{Float64}() for i in 1:NPIX]
 
 obs_range1 = 1:sum(runs(BASELINES)[1:2])
 obs_range2 = (sum(runs(BASELINES)[1:2]) + 1):NTOD
 
-obs_list = Observation[
-    observation(
+obs_list = [
+    Observation{Float64}(
         pixidx = PIXIDX[obs_range1],
         psi_angle = PSI[obs_range1],
         tod = y[obs_range1],
         sigma_squared = diagCw[obs_range1],
         name = "Det1",
     )
-    observation(
+    Observation{Float64}(
         pixidx = PIXIDX[obs_range2],
         psi_angle = PSI[obs_range2],
         tod = y[obs_range2],
@@ -111,7 +111,18 @@ obs_list = Observation[
     )
 ]
 
+let io = IOBuffer()
+    show(io, obs_list[1])
+    show(io, "text/plain", obs_list[2])
+end
+
 compute_nobs_matrix!(nobs_matrix, obs_list)
+
+# Test that NobsMatrixElement objects can be showed
+let io = IOBuffer()
+    show(io, nobs_matrix[1])
+    show(io, "text/plain", nobs_matrix[1])
+end
 
 # Verify that nobs_matrix is really a representation of matrix M
 for i in 1:NPIX
@@ -130,15 +141,21 @@ dest_baselines = [
     Float64[0.0, 0.0],
 ]
 
-destriping_data = DestripingData(
-    PolarizedMap{Float64, Healpix.RingOrder}(
-        zeros(12),
-        zeros(12),
-        zeros(12),
-    ),
-    Healpix.Map{Float64, Healpix.RingOrder}(1),
-    nobs_matrix,
+destriping_data = DestripingData{Float64, Healpix.RingOrder}(
+    1,
+    obs_list,
+    [runs(BASELINES)[1:2], runs(BASELINES)[3:4]],
+    max_iterations = 15,
+    threshold = 1e-14,
+    use_preconditioner = true,
 )
+
+# Check that the "show" method works in all its forms
+
+let io = IOBuffer()
+    show(io, destriping_data)
+    show(io, "text/plain", destriping_data)
+end
 
 compute_z_and_group!(
     dest_baselines,
@@ -167,21 +184,13 @@ compute_z_and_group!(
 @test collect(Iterators.flatten(left_side)) ≈ A * values(BASELINES)
 
 reset_maps!(destriping_data)
-start_baselines = [
-    RunLengthArray{Int,Float64}(runs(BASELINES)[1:2], [0.0, 0.0]),
-    RunLengthArray{Int,Float64}(runs(BASELINES)[3:4], [0.0, 0.0]),
-]
 
 destripe!(
     obs_list,
-    start_baselines,
     destriping_data,
-    max_iterations = 15,
-    threshold = 1e-14,
-    use_preconditioner = true,
 )
 
-estimated_baselines = collect(Iterators.flatten([x.values for x in start_baselines]))
+estimated_baselines = collect(Iterators.flatten([x.values for x in destriping_data.baselines]))
 @test estimated_baselines ≈ collect(BASELINES.values)
 
 @test (abs.(destriping_data.skymap.i .- skymap.i) |> maximum) < 0.3

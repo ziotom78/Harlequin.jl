@@ -22,13 +22,44 @@ larger than the available memory on a machine. In this case, the
 destriper can take advantage of a distributed-memory environment and
 of the MPI libraries.
 
+Destriping is based on a datatype, [`DestripingData`](@ref), and on
+the function [`destripe!`](@ref). To use the destriper, you create an
+object of type [`DestripingData`](@ref) and then call
+[`destripe!`](@ref) on it. The TOD must be split in a set of
+*observations*, using the datatype [`Observation`](@ref); we will see
+how to use them in the section [Splitting a TOD into
+observations](@ref).
+
+## Splitting a TOD into observations
+
+```@docs
+Observation
+```
+
 ## High-level functions
 
 ```@docs
+DestripingData
 destripe!
 ```
 
 ## Low-level functions
 
+The following functions are listed here for reference. You are not
+expected to use them, unless you want to debug the destriper or dig
+into its internals.
+
 ```@docs
+update_nobs!
+update_nobs_matrix!
+compute_nobs_matrix!
+update_binned_map!
+reset_maps!
+compute_z_and_subgroup!
+compute_z_and_group!
+compute_residuals!
+array_dot
+calc_stopping_factor
+apply_offset_to_baselines!
+calculate_cleaned_map!
 ```
