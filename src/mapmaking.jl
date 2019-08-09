@@ -76,6 +76,8 @@ include("mapmaking_nobsmatrixelement.jl")
 include("mapmaking_observations.jl")
 include("mapmaking_destripingdata.jl")
 include("mapmaking_cleanedtod.jl")
+include("mapmaking_preconditioners.jl")
+include("mapmaking_covmatrix.jl")
 
 ################################################################################
 
@@ -567,9 +569,6 @@ function calculate_cleaned_map!(
         destriping_data.skymap.u[curpix] = iqu[3]
     end
 end
-
-include("mapmaking_preconditioners.jl")
-include("mapmaking_covmatrix.jl")
 
 @doc raw"""
     destripe!(obs_list, destriping_data::DestripingData{T,O}; comm, unseen, callback) where {T <: Real, O <: Healpix.Order}
