@@ -1,6 +1,6 @@
 name = "Harlequin"
 uuid = "af1cbc52-b994-11e9-036a-87a15c7b4bde"
-authors = ["Maurizio Tomasi"]
+authors = ["Maurizio Tomasi <ziotom78@gmail.com>"]
 version = "0.1.0"
 
 [deps]
