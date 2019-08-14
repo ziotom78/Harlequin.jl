@@ -95,7 +95,7 @@ function update_binned_map!(
         hitmap[mapidx] += 1 / sigmasamp
     end
 
-    if comm != nothing
+    if use_mpi() && comm != nothing
         skymap.i .= MPI.allreduce(skymap.i, MPI.SUM, comm)
         skymap.q .= MPI.allreduce(skymap.q, MPI.SUM, comm)
         skymap.u .= MPI.allreduce(skymap.u, MPI.SUM, comm)

@@ -20,7 +20,18 @@ Since the destriper is effective only when much data is available, it
 is often the case that the input data to be fed to the algorithm is
 larger than the available memory on a machine. In this case, the
 destriper can take advantage of a distributed-memory environment and
-of the MPI libraries.
+of the MPI libraries, if they have been loaded *before* Harlequin,
+like in the following example:
+
+```julia
+import MPI
+import Harlequin  # Ok, use MPI whenever possible
+
+# ...
+```
+
+You can check if MPI is being used with the function
+[`use_mpi`](@ref).
 
 Destriping is based on a datatype, [`DestripingData`](@ref), and on
 the function [`destripe!`](@ref). To use the destriper, you create an
@@ -41,6 +52,7 @@ Observation
 ```@docs
 DestripingData
 destripe!
+use_mpi
 ```
 
 ## Low-level functions

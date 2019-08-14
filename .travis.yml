@@ -16,6 +16,17 @@ after_success:
   - julia -e 'using Pkg; Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
 jobs:
   include:
+    - stage: MPI
+      julia: 1.0
+      script: julia --project=docs -e '
+          using Pkg;
+          Pkg.add("MPI");
+          using MPI;
+          Pkg.develop(PackageSpec(path=pwd()));
+          Pkg.instantiate();
+          Pkg.test();'
+      after_success: skip
+  include:
     - stage: Documentation
       julia: 1.0
       script: julia --project=docs -e '
