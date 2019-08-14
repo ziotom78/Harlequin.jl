@@ -48,7 +48,7 @@ BASELINES = RunLengthArray{Int, Float64}(
 )
 
 # Map with NSIDE = 1
-skymap = PolarizedMap{Float64, Healpix.RingOrder}(
+skymap = Healpix.PolarizedMap{Float64, Healpix.RingOrder}(
     Float64[1,   3,   -4,    6,    5,   -1,   -4,    2,   8,   0,   -1,   -2],
     Float64[1.0, 1.8,  0.7,  6.8, -2.2,  6.0,  0.3, -0.3, 4.7, 7.2,  5.1,  7.2],
     Float64[1.2, 0.4,  0.7, -1.4,  5.4,  4.9,  4.1, -1.0, 4.2, 5.9,  2.4,  3.8],

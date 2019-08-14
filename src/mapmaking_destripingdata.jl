@@ -54,7 +54,7 @@ result of its computation.
 
 """
 mutable struct DestripingData{T <: Real, O <: Healpix.Order}
-    skymap::PolarizedMap{T, O}
+    skymap::Healpix.PolarizedMap{T, O}
     hitmap::Healpix.Map{T, O}
     nobs_matrix::Vector{NobsMatrixElement{T}}
     baselines::Vector{RunLengthArray{Int, T}}
@@ -81,7 +81,7 @@ mutable struct DestripingData{T <: Real, O <: Healpix.Order}
         compute_nobs_matrix!(nobs_matrix, obs_list)
 
         new(
-            PolarizedMap{T, O}(
+            Healpix.PolarizedMap{T, O}(
                 zeros(npix),
                 zeros(npix),
                 zeros(npix),

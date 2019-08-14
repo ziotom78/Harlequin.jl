@@ -1,6 +1,6 @@
 # -*- encoding: utf-8 -*-
 
-export PolarizedMap, NobsMatrixElement, Observation, DestripingData, CleanedTOD
+export NobsMatrixElement, Observation, DestripingData, CleanedTOD
 export update_nobs!, update_nobs_matrix!, observation, compute_nobs_matrix!
 export update_binned_map!, reset_maps!, compute_z_and_subgroup!, compute_z_and_group!
 export compute_residuals!, array_dot, calc_stopping_factor, apply_offset_to_baselines!
@@ -25,50 +25,6 @@ import Printf: @sprintf
 # as many functions and variable defined here use the same letters and
 # symbols of that paper. We refer to it in code comments and
 # docstrings as "KurkiSuonio2009".
-
-################################################################################
-
-@doc raw"""
-    mutable struct PolarizedMap{T, O <: Healpix.Order}
-
-A polarized I/Q/U map. It contains three Healpix maps with the same NSIDE:
-
-- `i`
-- `q`
-- `u`
-
-You can create an instance of this type using the function
-[`PolarizedMap{T,O}`](@ref).
-
-"""
-mutable struct PolarizedMap{T, O <: Healpix.Order}
-    i::Healpix.Map{T,O}
-    q::Healpix.Map{T,O}
-    u::Healpix.Map{T,O}
-
-    PolarizedMap{T, O}(
-        i::Healpix.Map{T, O},
-        q::Healpix.Map{T, O},
-        u::Healpix.Map{T, O},
-    ) where {T, O <: Healpix.Order} = new(i, q, u)
-end
-
-function PolarizedMap{T, O}(
-    i::AbstractVector{T},
-    q::AbstractVector{T},
-    u::AbstractVector{T},
-) where {T, O <: Healpix.Order}
-
-    @assert length(i) == length(q)
-    @assert length(i) == length(u)
-
-    PolarizedMap{T, O}(
-        Healpix.Map{T, O}(i),
-        Healpix.Map{T, O}(q),
-        Healpix.Map{T, O}(u),
-    )
-end
-
 
 ################################################################################
 
@@ -117,7 +73,7 @@ end
 
 function update_binned_map!(
     vec,
-    skymap::PolarizedMap{T, O},
+    skymap::Healpix.PolarizedMap{T, O},
     hitmap::Healpix.Map{T, O},
     obs::Observation{T};
     comm = nothing,
@@ -148,7 +104,7 @@ function update_binned_map!(
 end
 
 function update_binned_map!(
-    skymap::PolarizedMap{T, O},
+    skymap::Healpix.PolarizedMap{T, O},
     hitmap::Healpix.Map{T, O},
     obs::Observation{T};
     comm = nothing,
@@ -167,7 +123,7 @@ end
 
 function update_binned_map!(
     vec_list,
-    skymap::PolarizedMap{T, O},
+    skymap::Healpix.PolarizedMap{T, O},
     hitmap::Healpix.Map{T, O},
     obs_list::Vector{Observation{T}};
     comm = nothing,
@@ -189,7 +145,7 @@ function update_binned_map!(
 end
 
 function update_binned_map!(
-    skymap::PolarizedMap{T, O},
+    skymap::Healpix.PolarizedMap{T, O},
     hitmap::Healpix.Map{T, O},
     obs_list::Vector{Observation{T}};
     comm = nothing,
