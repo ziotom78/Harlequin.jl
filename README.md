@@ -31,6 +31,15 @@ A few advantages of Harlequin over TOAST are the following:
   widgets](https://github.com/JuliaGizmos/Interact.jl), [error
   propagation](https://github.com/JuliaPhysics/Measurements.jl), etc.
 
+# Installation
+
+Start the `julia` prompt and run the following commands:
+
+```julia
+import Pkg
+Pkg.add("Harlequin")
+```
+
 # Documentation
 
 It is available both for the
