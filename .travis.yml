@@ -14,6 +14,15 @@ notifications:
   email: false
 after_success:
   - julia -e 'using Pkg; Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
+before_install:
+  - sh ./conf/travis-install-mpi.sh
+  # Work around OpenMPI attempting to create overly long temporary
+  # file names - and erroring as a result
+  - export TMPDIR=/tmp
+  # Work around MacOS/OpenMPI issue:
+  #   https://github.com/open-mpi/ompi/issues/6518
+  #   https://github.com/open-mpi/ompi/issues/5798
+  - export OMPI_MCA_btl=self,tcp
 jobs:
   include:
     - stage: MPI

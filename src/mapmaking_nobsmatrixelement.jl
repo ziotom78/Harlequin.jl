@@ -129,7 +129,8 @@ function update_nobs_matrix!(
     psi_angle,
     sigma_squared,
     pixidx,
-    flagged,
+    flagged;
+    comm = nothing,
 ) where {T <: Real}
 
     @assert length(psi_angle) == length(sigma_squared)
@@ -155,5 +156,12 @@ function update_nobs_matrix!(
         nobs_matrix[curpix].m[2, 3] += cos_term * sin_term * constant
 
         nobs_matrix[curpix].m[3, 3] += sin_term^2 * constant
+    end
+
+    if use_mpi() && comm != nothing
+        for curpix in eachindex(nobs_matrix)
+            # TODO: repeated calls to MPI_AllReduce are tremendously slow!
+            MPI.Allreduce!(MPI.IN_PLACE, nobs_matrix[curpix].m, +, comm)
+        end
     end
 end

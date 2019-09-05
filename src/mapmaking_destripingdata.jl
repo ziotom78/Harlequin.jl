@@ -70,6 +70,7 @@ mutable struct DestripingData{T <: Real, O <: Healpix.Order}
         threshold = 1e-9,
         max_iterations = 1000,
         use_preconditioner = true,
+        comm = nothing,
     ) where {T <: Real, O <: Healpix.Order}
 
         @assert length(obs_list) == length(runs)
@@ -78,7 +79,7 @@ mutable struct DestripingData{T <: Real, O <: Healpix.Order}
 
         npix = Healpix.nside2npix(nside)
         nobs_matrix = [NobsMatrixElement{T}() for i in 1:npix]
-        compute_nobs_matrix!(nobs_matrix, obs_list)
+        compute_nobs_matrix!(nobs_matrix, obs_list, comm = comm)
 
         new(
             Healpix.PolarizedMap{T, O}(

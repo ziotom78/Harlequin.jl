@@ -23,7 +23,7 @@ Return `true` if Harlequin is taking advantage of MPI, `false` if not.
 use_mpi() = false
 
 function __init__()
-    @require MPI="da04e1cc-30fd-572f-bb4f-1f8673147195" use_mpi() = true
+    @require MPI="da04e1cc-30fd-572f-bb4f-1f8673147195" include("mpi.jl")
 end
 
 include("quaternions.jl")

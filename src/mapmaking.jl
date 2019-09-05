@@ -38,7 +38,7 @@ include("mapmaking_covmatrix.jl")
 ################################################################################
 
 @doc raw"""
-    compute_nobs_matrix!(nobs_matrix::Vector{NobsMatrixElement}, observations::Vector{Observation{T}})
+    compute_nobs_matrix!(nobs_matrix::Vector{NobsMatrixElement}, observations::Vector{Observation{T}}; comm = nothing)
 
 Initialize all the elements in `nobs_matrix` so that they are the
 matrices M_p in Eq. (10) of KurkiSuonio2009. The TOD is taken from the
@@ -47,7 +47,8 @@ list of observations in the parameter `observations`.
 """
 function compute_nobs_matrix!(
     nobs_matrix::Vector{NobsMatrixElement{T}},
-    observations::Vector{Observation{T}},
+    observations::Vector{Observation{T}};
+    comm = nothing,
 ) where {T <: Real}
 
     for submatrix in nobs_matrix
@@ -61,6 +62,7 @@ function compute_nobs_matrix!(
             observations[idx].sigma_squared,
             observations[idx].pixidx,
             observations[idx].flagged,
+            comm = comm,
         )
     end
 
@@ -96,10 +98,10 @@ function update_binned_map!(
     end
 
     if use_mpi() && comm != nothing
-        skymap.i .= MPI.allreduce(skymap.i, MPI.SUM, comm)
-        skymap.q .= MPI.allreduce(skymap.q, MPI.SUM, comm)
-        skymap.u .= MPI.allreduce(skymap.u, MPI.SUM, comm)
-        hitmap[:] = MPI.allreduce(hitmap, MPI.SUM, comm)
+        MPI.Allreduce!(MPI.IN_PLACE, skymap.i.pixels, MPI.SUM, comm)
+        MPI.Allreduce!(MPI.IN_PLACE, skymap.q.pixels, MPI.SUM, comm)
+        MPI.Allreduce!(MPI.IN_PLACE, skymap.u.pixels, MPI.SUM, comm)
+        MPI.Allreduce!(MPI.IN_PLACE, hitmap.pixels, MPI.SUM, comm)
     end
 end
 
@@ -391,6 +393,8 @@ function compute_residuals!(
         baseline_lengths,
         destriping_data,
         obs_list,
+        comm = comm,
+        unseen = unseen,
     )
 
     left_side = [Array{T}(undef, length(residuals[idx])) for idx in 1:length(residuals)]
@@ -403,6 +407,8 @@ function compute_residuals!(
         baseline_lengths,
         destriping_data,
         obs_list,
+        comm = comm,
+        unseen = unseen,
     )
 end
 
@@ -421,6 +427,10 @@ function array_dot(
         result += dot(values(curx), cury)
     end
 
+    if use_mpi() && comm != nothing
+        result = MPI.Allreduce(result, +, comm)
+    end
+    
     result
 end
 
@@ -430,6 +440,10 @@ function array_dot(x, y; comm = nothing)
     result = 0.0
     for (curx, cury) in zip(x, y)
         result += dot(curx, cury)
+    end
+
+    if use_mpi() && comm != nothing
+        result = MPI.Allreduce(result, +, comm)
     end
 
     result
@@ -463,7 +477,8 @@ Add a constant offset to all the baselines such that their sum is zero.
 
 """
 function apply_offset_to_baselines!(
-    baselines::Array{RunLengthArray{Int, T}, 1},
+    baselines::Array{RunLengthArray{Int, T}, 1};
+    comm = nothing,
 ) where {T <: Real}
 
     baseline_sum = 0.0
@@ -472,6 +487,12 @@ function apply_offset_to_baselines!(
         baseline_sum += sum(values(cur_baseline))
         baseline_num += length(values(cur_baseline))
     end
+
+    if use_mpi() && comm != nothing
+        baseline_sum = MPI.Allreduce(baseline_sum, +, comm)
+        baseline_num = MPI.Allreduce(baseline_num, +, comm)
+    end
+    
     baseline_sum /= baseline_num
 
     for cur_baseline in baselines
@@ -583,7 +604,7 @@ function destripe!(
          for idx in 1:length(obs_list)]
     rnext = deepcopy(r)
 
-    compute_nobs_matrix!(destriping_data.nobs_matrix, obs_list)
+    compute_nobs_matrix!(destriping_data.nobs_matrix, obs_list, comm = comm)
 
     compute_residuals!(
         r,
@@ -646,7 +667,7 @@ function destripe!(
             rnext[obsidx] .= r[obsidx] - γ * ap[obsidx]
         end
         # Remove the mean value from the baselines
-        apply_offset_to_baselines!(destriping_data.baselines)
+        apply_offset_to_baselines!(destriping_data.baselines, comm = comm)
 
         stopping_factor = calc_stopping_factor(r, comm = comm)
         push!(destriping_data.stopping_factors, stopping_factor)

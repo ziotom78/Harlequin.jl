@@ -24,3 +24,11 @@ end
 @testset "Map-making functions" begin
     include("test_mapmaking.jl")
 end
+
+@testset "MPI" begin
+    import MPI: mpiexec
+
+    nprocs = 2  # test_mapmaking.jl assumes that only two processes are being used!
+    juliaexec = joinpath(Sys.BINDIR, Base.julia_exename())
+    @test success(`$mpiexec -n $nprocs $juliaexec test_mpi.jl`)
+end
